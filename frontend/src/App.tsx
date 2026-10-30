@@ -74,7 +74,7 @@ type Page =
   | "Inventory"
   | "Settings"
   | "InvoicePreview"
-  | "App Updates";
+  | "Version & Updates";
 
 const nav = [
   ["Dashboard", LayoutDashboard],
@@ -88,7 +88,7 @@ const nav = [
   ["Contacts", Users],
   ["Inventory", Package],
   ["Settings", Settings],
-  ["App Updates", DownloadCloud]
+  ["Version & Updates", DownloadCloud]
 ] as const;
 
 const salesData = [
@@ -996,6 +996,105 @@ export function App() {
           Get support <ArrowUpRight size={12} />
         </a>
       </div>
+
+      {/* Sidebar Version & Live Update Menu Card */}
+      <div
+        style={{
+          marginTop: "14px",
+          background: "rgba(255, 255, 255, 0.08)",
+          border: "1px solid rgba(255, 255, 255, 0.14)",
+          borderRadius: "10px",
+          padding: "12px",
+          fontSize: "11px",
+          color: "#dce9fb"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+          <div
+            onClick={() => {
+              setPage("Version & Updates");
+              setMobile(false);
+            }}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 600, cursor: "pointer" }}
+            title="Open Version Details"
+          >
+            <GitBranch size={13} style={{ color: "#60a5fa" }} />
+            <span>Version</span>
+          </div>
+          <span
+            onClick={() => {
+              setPage("Version & Updates");
+              setMobile(false);
+            }}
+            style={{
+              background: hasUpdate ? "#fef3c7" : "rgba(96, 165, 250, 0.2)",
+              color: hasUpdate ? "#b45309" : "#93c5fd",
+              padding: "2px 7px",
+              borderRadius: "4px",
+              fontSize: "10px",
+              fontWeight: 700,
+              cursor: "pointer"
+            }}
+          >
+            v{currentVersion}
+          </span>
+        </div>
+
+        <div style={{ fontSize: "10px", color: "#93c5fd", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Channel: Release</span>
+          {hasUpdate ? (
+            <span style={{ color: "#34d399", fontWeight: 700 }}>v{latestVersion} available</span>
+          ) : (
+            <span style={{ color: "#86efac", display: "inline-flex", alignItems: "center", gap: "2px" }}>
+              <Check size={10} /> Up to date
+            </span>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={hasUpdate ? handleTriggerAutoUpdate : handleManualCheckUpdate}
+          disabled={checkingUpdate}
+          style={{
+            width: "100%",
+            padding: "7px 10px",
+            borderRadius: "7px",
+            background: hasUpdate ? "#2563eb" : "rgba(255, 255, 255, 0.12)",
+            color: "#ffffff",
+            border: "none",
+            fontSize: "11px",
+            fontWeight: 600,
+            cursor: checkingUpdate ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            transition: "all 0.15s ease"
+          }}
+        >
+          <RefreshCw size={12} className={checkingUpdate ? "spin" : ""} />
+          {checkingUpdate
+            ? "Checking GitHub..."
+            : hasUpdate
+            ? `Update to v${latestVersion}`
+            : "Check for updates"}
+        </button>
+
+        {updateCheckMsg && (
+          <div
+            style={{
+              marginTop: "7px",
+              fontSize: "10px",
+              color: updateCheckMsg.includes("found") ? "#34d399" : "#bfdbfe",
+              textAlign: "center",
+              lineHeight: 1.2
+            }}
+          >
+            {updateCheckMsg}
+          </div>
+        )}
+      </div>
+
       <div className="profile" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
           <b className="avatar">
@@ -1762,7 +1861,7 @@ export function App() {
   }
 
   // 10. APP UPDATES & VERSION CONTROL
-  else if (page === "App Updates") {
+  else if (page === "Version & Updates") {
     screen = (
       <>
         <Heading
