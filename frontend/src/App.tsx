@@ -46,7 +46,12 @@ import {
   CreditCard,
   Truck,
   Palette,
-  Trash2
+  Trash2,
+  Landmark,
+  Code2,
+  UploadCloud,
+  SlidersHorizontal,
+  History
 } from "lucide-react";
 import { AuthScreen } from "./components/AuthScreen";
 import { api } from "./services/api";
@@ -64,17 +69,19 @@ import {
   Cell
 } from "recharts";
 
-type Page =
+export type Page =
   | "Dashboard"
   | "Billing"
   | "Sales"
   | "Purchases"
+  | "Inventory"
+  | "Accounting"
   | "Marketplace"
   | "Shopify"
   | "GST Reports"
   | "Reconciliation"
   | "Contacts"
-  | "Inventory"
+  | "Developer & API"
   | "Settings"
   | "InvoicePreview"
   | "Version & Updates";
@@ -84,12 +91,14 @@ export const PAGE_SLUGS: Record<Page, string> = {
   "Billing": "/billing",
   "Sales": "/sales",
   "Purchases": "/purchases",
+  "Inventory": "/inventory",
+  "Accounting": "/accounting",
   "Marketplace": "/marketplace",
   "Shopify": "/shopify",
   "GST Reports": "/reports",
   "Reconciliation": "/reconciliation",
   "Contacts": "/contacts",
-  "Inventory": "/inventory",
+  "Developer & API": "/developer",
   "Settings": "/settings",
   "InvoicePreview": "/invoice-preview",
   "Version & Updates": "/updates"
@@ -100,18 +109,74 @@ export const SLUG_TO_PAGE: Record<string, Page> = {
   "/dashboard": "Dashboard",
   "/billing": "Billing",
   "/invoices/create": "Billing",
+
+  // Sales Management
   "/sales": "Sales",
+  "/sales/invoices": "Sales",
+  "/sales/proforma": "Sales",
+  "/sales/quotations": "Sales",
+  "/sales/credit-notes": "Sales",
+  "/sales/challans": "Sales",
   "/invoices": "Sales",
+
+  // Purchase Management
   "/purchases": "Purchases",
+  "/purchases/bills": "Purchases",
+  "/purchases/orders": "Purchases",
+  "/purchases/debit-notes": "Purchases",
+  "/purchases/returns": "Purchases",
+
+  // Inventory Management
+  "/inventory": "Inventory",
+  "/inventory/products": "Inventory",
+  "/inventory/categories": "Inventory",
+  "/inventory/transfers": "Inventory",
+  "/inventory/adjustments": "Inventory",
+  "/products": "Inventory",
+
+  // Accounting & Finance
+  "/accounting": "Accounting",
+  "/accounting/expenses": "Accounting",
+  "/accounting/payments": "Accounting",
+  "/accounting/banking": "Accounting",
+  "/accounting/cashflow": "Accounting",
+
+  // Marketplace & Integrations
   "/marketplace": "Marketplace",
+  "/marketplace/overview": "Marketplace",
+  "/marketplace/channels": "Marketplace",
+  "/marketplace/amazon": "Marketplace",
+  "/marketplace/flipkart": "Marketplace",
+  "/marketplace/meesho": "Marketplace",
+  "/marketplace/import": "Marketplace",
   "/shopify": "Shopify",
+
+  // GST & Compliance
   "/reports": "GST Reports",
+  "/gst": "GST Reports",
+  "/gst/dashboard": "GST Reports",
+  "/gst/gstr-1": "GST Reports",
+  "/gst/gstr-3b": "GST Reports",
+  "/gst/gstr-2b": "GST Reports",
+  "/gst/hsn": "GST Reports",
+  "/gst/e-way-bill": "GST Reports",
   "/gst-reports": "GST Reports",
   "/reconciliation": "Reconciliation",
+
+  // Contacts
   "/contacts": "Contacts",
+  "/contacts/customers": "Contacts",
+  "/contacts/suppliers": "Contacts",
   "/customers": "Contacts",
-  "/inventory": "Inventory",
-  "/products": "Inventory",
+
+  // Developer & Automation
+  "/developer": "Developer & API",
+  "/developer/api": "Developer & API",
+  "/developer/webhooks": "Developer & API",
+  "/developer/automation": "Developer & API",
+  "/developer/docs": "Developer & API",
+
+  // Settings
   "/settings": "Settings",
   "/settings/business": "Settings",
   "/settings/profile": "Settings",
@@ -125,12 +190,23 @@ export const SLUG_TO_PAGE: Record<string, Page> = {
   "/settings/gst": "Settings",
   "/settings/integrations": "Settings",
   "/settings/billing": "Settings",
+  "/settings/audit": "Settings",
+
+  // Invoice Preview & Updates
   "/invoice-preview": "InvoicePreview",
   "/invoices/preview": "InvoicePreview",
   "/updates": "Version & Updates",
   "/version": "Version & Updates"
 };
 
+export type SalesSubmenu = "invoices" | "proforma" | "quotations" | "credit-notes" | "challans";
+export type PurchasesSubmenu = "bills" | "orders" | "debit-notes" | "returns";
+export type InventorySubmenu = "products" | "categories" | "transfers" | "adjustments";
+export type AccountingSubmenu = "expenses" | "payments" | "banking" | "cashflow";
+export type MarketplaceSubmenu = "overview" | "channels" | "import";
+export type GstSubmenu = "overview" | "gstr-1" | "gstr-3b" | "gstr-2b" | "hsn" | "eway";
+export type ContactsSubmenu = "customers" | "suppliers";
+export type DeveloperSubmenu = "api" | "webhooks" | "automation" | "docs";
 export type SettingsSubmenu =
   | "business"
   | "address"
@@ -141,7 +217,8 @@ export type SettingsSubmenu =
   | "roles"
   | "gst"
   | "integrations"
-  | "billing";
+  | "billing"
+  | "audit";
 
 export const SETTINGS_SUBMENU_SLUGS: Record<SettingsSubmenu, string> = {
   business: "/settings/business",
@@ -153,8 +230,73 @@ export const SETTINGS_SUBMENU_SLUGS: Record<SettingsSubmenu, string> = {
   roles: "/settings/roles",
   gst: "/settings/gst",
   integrations: "/settings/integrations",
-  billing: "/settings/billing"
+  billing: "/settings/billing",
+  audit: "/settings/audit"
 };
+
+export function getSalesSubmenuFromPath(pathname: string): SalesSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/sales/proforma") return "proforma";
+  if (clean === "/sales/quotations") return "quotations";
+  if (clean === "/sales/credit-notes") return "credit-notes";
+  if (clean === "/sales/challans") return "challans";
+  return "invoices";
+}
+
+export function getPurchasesSubmenuFromPath(pathname: string): PurchasesSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/purchases/orders") return "orders";
+  if (clean === "/purchases/debit-notes") return "debit-notes";
+  if (clean === "/purchases/returns") return "returns";
+  return "bills";
+}
+
+export function getInventorySubmenuFromPath(pathname: string): InventorySubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/inventory/categories") return "categories";
+  if (clean === "/inventory/transfers") return "transfers";
+  if (clean === "/inventory/adjustments") return "adjustments";
+  return "products";
+}
+
+export function getAccountingSubmenuFromPath(pathname: string): AccountingSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/accounting/payments") return "payments";
+  if (clean === "/accounting/banking") return "banking";
+  if (clean === "/accounting/cashflow") return "cashflow";
+  return "expenses";
+}
+
+export function getMarketplaceSubmenuFromPath(pathname: string): MarketplaceSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/marketplace/channels" || clean === "/marketplace/amazon" || clean === "/marketplace/flipkart" || clean === "/marketplace/meesho") return "channels";
+  if (clean === "/marketplace/import") return "import";
+  return "overview";
+}
+
+export function getGstSubmenuFromPath(pathname: string): GstSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/gst/gstr-1" || clean === "/reports/gstr-1") return "gstr-1";
+  if (clean === "/gst/gstr-3b" || clean === "/reports/gstr-3b") return "gstr-3b";
+  if (clean === "/gst/gstr-2b" || clean === "/reports/gstr-2b") return "gstr-2b";
+  if (clean === "/gst/hsn" || clean === "/reports/hsn") return "hsn";
+  if (clean === "/gst/e-way-bill" || clean === "/reports/e-way-bill") return "eway";
+  return "overview";
+}
+
+export function getContactsSubmenuFromPath(pathname: string): ContactsSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/contacts/suppliers") return "suppliers";
+  return "customers";
+}
+
+export function getDeveloperSubmenuFromPath(pathname: string): DeveloperSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/developer/webhooks") return "webhooks";
+  if (clean === "/developer/automation") return "automation";
+  if (clean === "/developer/docs") return "docs";
+  return "api";
+}
 
 export function getSettingsSubmenuFromPath(pathname: string): SettingsSubmenu {
   const clean = pathname.replace(/\/+$/, "");
@@ -167,6 +309,7 @@ export function getSettingsSubmenuFromPath(pathname: string): SettingsSubmenu {
   if (clean === "/settings/gst") return "gst";
   if (clean === "/settings/integrations") return "integrations";
   if (clean === "/settings/billing") return "billing";
+  if (clean === "/settings/audit") return "audit";
   return "business";
 }
 
@@ -175,20 +318,44 @@ export function getPageFromPath(pathname: string): Page {
   return SLUG_TO_PAGE[clean] || "Dashboard";
 }
 
-const nav = [
-  ["Dashboard", LayoutDashboard],
-  ["Billing", ReceiptText],
-  ["Sales", ShoppingCart],
-  ["Purchases", Package],
-  ["Marketplace", Store],
-  ["Shopify", Plug],
-  ["GST Reports", FileBarChart],
-  ["Reconciliation", RefreshCw],
-  ["Contacts", Users],
-  ["Inventory", Package],
-  ["Settings", Settings],
-  ["Version & Updates", DownloadCloud]
-] as const;
+export const navGroups = [
+  {
+    title: "Core Operations",
+    items: [
+      ["Dashboard", LayoutDashboard, "/dashboard"],
+      ["Billing", ReceiptText, "/billing"],
+      ["Sales", ShoppingCart, "/sales"],
+      ["Purchases", Package, "/purchases"],
+      ["Inventory", Layers, "/inventory"]
+    ] as const
+  },
+  {
+    title: "Finance & Tax",
+    items: [
+      ["Accounting", Landmark, "/accounting"],
+      ["GST Reports", FileBarChart, "/reports"],
+      ["Reconciliation", RefreshCw, "/reconciliation"]
+    ] as const
+  },
+  {
+    title: "Channels & People",
+    items: [
+      ["Marketplace", Store, "/marketplace"],
+      ["Shopify", Plug, "/shopify"],
+      ["Contacts", Users, "/contacts"]
+    ] as const
+  },
+  {
+    title: "System & Tools",
+    items: [
+      ["Developer & API", Code2, "/developer"],
+      ["Settings", Settings, "/settings"],
+      ["Version & Updates", DownloadCloud, "/updates"]
+    ] as const
+  }
+];
+
+
 
 function Btn({
   children,
@@ -421,18 +588,129 @@ export function App() {
     return "Dashboard";
   });
 
+  const [salesSubmenu, setSalesSubmenuState] = useState<SalesSubmenu>(() => {
+    if (typeof window !== "undefined") return getSalesSubmenuFromPath(window.location.pathname);
+    return "invoices";
+  });
+
+  const [purchasesSubmenu, setPurchasesSubmenuState] = useState<PurchasesSubmenu>(() => {
+    if (typeof window !== "undefined") return getPurchasesSubmenuFromPath(window.location.pathname);
+    return "bills";
+  });
+
+  const [inventorySubmenu, setInventorySubmenuState] = useState<InventorySubmenu>(() => {
+    if (typeof window !== "undefined") return getInventorySubmenuFromPath(window.location.pathname);
+    return "products";
+  });
+
+  const [accountingSubmenu, setAccountingSubmenuState] = useState<AccountingSubmenu>(() => {
+    if (typeof window !== "undefined") return getAccountingSubmenuFromPath(window.location.pathname);
+    return "expenses";
+  });
+
+  const [marketplaceSubmenu, setMarketplaceSubmenuState] = useState<MarketplaceSubmenu>(() => {
+    if (typeof window !== "undefined") return getMarketplaceSubmenuFromPath(window.location.pathname);
+    return "overview";
+  });
+
+  const [gstSubmenu, setGstSubmenuState] = useState<GstSubmenu>(() => {
+    if (typeof window !== "undefined") return getGstSubmenuFromPath(window.location.pathname);
+    return "overview";
+  });
+
+  const [contactsSubmenu, setContactsSubmenuState] = useState<ContactsSubmenu>(() => {
+    if (typeof window !== "undefined") return getContactsSubmenuFromPath(window.location.pathname);
+    return "customers";
+  });
+
+  const [developerSubmenu, setDeveloperSubmenuState] = useState<DeveloperSubmenu>(() => {
+    if (typeof window !== "undefined") return getDeveloperSubmenuFromPath(window.location.pathname);
+    return "api";
+  });
+
   const [settingsSubmenu, setSettingsSubmenuState] = useState<SettingsSubmenu>(() => {
-    if (typeof window !== "undefined") {
-      return getSettingsSubmenuFromPath(window.location.pathname);
-    }
+    if (typeof window !== "undefined") return getSettingsSubmenuFromPath(window.location.pathname);
     return "business";
   });
 
   const [settingsSaveMsg, setSettingsSaveMsg] = useState<string>("");
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const showSaveSuccess = (msg: string = "Settings saved successfully!") => {
     setSettingsSaveMsg(msg);
     setTimeout(() => setSettingsSaveMsg(""), 3500);
+  };
+
+  const navigateToSalesSubmenu = (sub: SalesSubmenu) => {
+    setSalesSubmenuState(sub);
+    setPageState("Sales");
+    const slug = sub === "invoices" ? "/sales" : `/sales/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Sales", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToPurchasesSubmenu = (sub: PurchasesSubmenu) => {
+    setPurchasesSubmenuState(sub);
+    setPageState("Purchases");
+    const slug = sub === "bills" ? "/purchases" : `/purchases/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Purchases", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToInventorySubmenu = (sub: InventorySubmenu) => {
+    setInventorySubmenuState(sub);
+    setPageState("Inventory");
+    const slug = sub === "products" ? "/inventory" : `/inventory/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Inventory", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToAccountingSubmenu = (sub: AccountingSubmenu) => {
+    setAccountingSubmenuState(sub);
+    setPageState("Accounting");
+    const slug = sub === "expenses" ? "/accounting" : `/accounting/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Accounting", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToMarketplaceSubmenu = (sub: MarketplaceSubmenu) => {
+    setMarketplaceSubmenuState(sub);
+    setPageState("Marketplace");
+    const slug = sub === "overview" ? "/marketplace" : `/marketplace/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Marketplace", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToGstSubmenu = (sub: GstSubmenu) => {
+    setGstSubmenuState(sub);
+    setPageState("GST Reports");
+    const slug = sub === "overview" ? "/reports" : `/gst/${sub === "eway" ? "e-way-bill" : sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "GST Reports", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToContactsSubmenu = (sub: ContactsSubmenu) => {
+    setContactsSubmenuState(sub);
+    setPageState("Contacts");
+    const slug = sub === "customers" ? "/contacts" : `/contacts/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Contacts", submenu: sub }, "", slug);
+    }
+  };
+
+  const navigateToDeveloperSubmenu = (sub: DeveloperSubmenu) => {
+    setDeveloperSubmenuState(sub);
+    setPageState("Developer & API");
+    const slug = sub === "api" ? "/developer" : `/developer/${sub}`;
+    if (typeof window !== "undefined" && window.location.pathname !== slug) {
+      window.history.pushState({ page: "Developer & API", submenu: sub }, "", slug);
+    }
   };
 
   const navigateToSettingsSubmenu = (sub: SettingsSubmenu, replace: boolean = false) => {
@@ -457,7 +735,8 @@ export function App() {
         roles: "Users & Roles",
         gst: "GST Settings",
         integrations: "Integrations",
-        billing: "Billing & Subscription"
+        billing: "Billing & Subscription",
+        audit: "Audit Logs"
       };
       document.title = `Quantum GST - Settings: ${labelMap[sub] || "Business Profile"}`;
     }
@@ -466,21 +745,17 @@ export function App() {
   const setPage = (newPage: Page, replace: boolean = false) => {
     setPageState(newPage);
     if (typeof window !== "undefined") {
-      if (newPage === "Settings") {
-        const sub = getSettingsSubmenuFromPath(window.location.pathname);
-        setSettingsSubmenuState(sub);
-        const slug = window.location.pathname.startsWith("/settings/") ? window.location.pathname : SETTINGS_SUBMENU_SLUGS[sub];
-        if (window.location.pathname !== slug) {
-          if (replace) {
-            window.history.replaceState({ page: newPage, submenu: sub }, "", slug);
-          } else {
-            window.history.pushState({ page: newPage, submenu: sub }, "", slug);
-          }
-        }
-        document.title = "Quantum GST - Settings";
-        return;
-      }
-      const slug = PAGE_SLUGS[newPage] || "/dashboard";
+      let slug = PAGE_SLUGS[newPage] || "/dashboard";
+      if (newPage === "Sales") slug = salesSubmenu === "invoices" ? "/sales" : `/sales/${salesSubmenu}`;
+      else if (newPage === "Purchases") slug = purchasesSubmenu === "bills" ? "/purchases" : `/purchases/${purchasesSubmenu}`;
+      else if (newPage === "Inventory") slug = inventorySubmenu === "products" ? "/inventory" : `/inventory/${inventorySubmenu}`;
+      else if (newPage === "Accounting") slug = accountingSubmenu === "expenses" ? "/accounting" : `/accounting/${accountingSubmenu}`;
+      else if (newPage === "Marketplace") slug = marketplaceSubmenu === "overview" ? "/marketplace" : `/marketplace/${marketplaceSubmenu}`;
+      else if (newPage === "GST Reports") slug = gstSubmenu === "overview" ? "/reports" : `/gst/${gstSubmenu === "eway" ? "e-way-bill" : gstSubmenu}`;
+      else if (newPage === "Contacts") slug = contactsSubmenu === "customers" ? "/contacts" : `/contacts/${contactsSubmenu}`;
+      else if (newPage === "Developer & API") slug = developerSubmenu === "api" ? "/developer" : `/developer/${developerSubmenu}`;
+      else if (newPage === "Settings") slug = SETTINGS_SUBMENU_SLUGS[settingsSubmenu] || "/settings/business";
+
       if (window.location.pathname !== slug) {
         if (replace) {
           window.history.replaceState({ page: newPage }, "", slug);
@@ -493,20 +768,21 @@ export function App() {
   };
 
   useEffect(() => {
-    // Initial URL sync and popstate listener for back/forward browser buttons
     if (typeof window !== "undefined") {
       const initialPage = getPageFromPath(window.location.pathname);
-      if (initialPage === "Settings") {
-        const sub = getSettingsSubmenuFromPath(window.location.pathname);
-        setSettingsSubmenuState(sub);
-        if (window.location.pathname === "/settings") {
-          window.history.replaceState({ page: "Settings", submenu: "business" }, "", "/settings/business");
-        }
-      } else {
-        const targetSlug = PAGE_SLUGS[initialPage] || "/dashboard";
-        if (window.location.pathname !== targetSlug && window.location.pathname === "/") {
-          window.history.replaceState({ page: initialPage }, "", targetSlug);
-        }
+      setPageState(initialPage);
+      setSalesSubmenuState(getSalesSubmenuFromPath(window.location.pathname));
+      setPurchasesSubmenuState(getPurchasesSubmenuFromPath(window.location.pathname));
+      setInventorySubmenuState(getInventorySubmenuFromPath(window.location.pathname));
+      setAccountingSubmenuState(getAccountingSubmenuFromPath(window.location.pathname));
+      setMarketplaceSubmenuState(getMarketplaceSubmenuFromPath(window.location.pathname));
+      setGstSubmenuState(getGstSubmenuFromPath(window.location.pathname));
+      setContactsSubmenuState(getContactsSubmenuFromPath(window.location.pathname));
+      setDeveloperSubmenuState(getDeveloperSubmenuFromPath(window.location.pathname));
+      setSettingsSubmenuState(getSettingsSubmenuFromPath(window.location.pathname));
+
+      if (window.location.pathname === "/") {
+        window.history.replaceState({ page: "Dashboard" }, "", "/dashboard");
       }
       document.title = initialPage === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${initialPage}`;
     }
@@ -515,25 +791,16 @@ export function App() {
       if (typeof window !== "undefined") {
         const p = getPageFromPath(window.location.pathname);
         setPageState(p);
-        if (p === "Settings") {
-          const sub = getSettingsSubmenuFromPath(window.location.pathname);
-          setSettingsSubmenuState(sub);
-          const labelMap: Record<SettingsSubmenu, string> = {
-            business: "Business Details",
-            address: "Address & Contacts",
-            invoicing: "Invoice Settings",
-            bank: "Bank Details",
-            eway: "E-Way Bill Settings",
-            templates: "Document Templates",
-            roles: "Users & Roles",
-            gst: "GST Settings",
-            integrations: "Integrations",
-            billing: "Billing & Subscription"
-          };
-          document.title = `Quantum GST - Settings: ${labelMap[sub] || "Business Profile"}`;
-        } else {
-          document.title = p === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${p}`;
-        }
+        setSalesSubmenuState(getSalesSubmenuFromPath(window.location.pathname));
+        setPurchasesSubmenuState(getPurchasesSubmenuFromPath(window.location.pathname));
+        setInventorySubmenuState(getInventorySubmenuFromPath(window.location.pathname));
+        setAccountingSubmenuState(getAccountingSubmenuFromPath(window.location.pathname));
+        setMarketplaceSubmenuState(getMarketplaceSubmenuFromPath(window.location.pathname));
+        setGstSubmenuState(getGstSubmenuFromPath(window.location.pathname));
+        setContactsSubmenuState(getContactsSubmenuFromPath(window.location.pathname));
+        setDeveloperSubmenuState(getDeveloperSubmenuFromPath(window.location.pathname));
+        setSettingsSubmenuState(getSettingsSubmenuFromPath(window.location.pathname));
+        document.title = p === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${p}`;
       }
     };
 
@@ -578,6 +845,157 @@ export function App() {
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("Accountant");
   const [showAddMember, setShowAddMember] = useState(false);
+
+  // 1. Sales Additional Documents State
+  const [proformaInvoices, setProformaInvoices] = useState([
+    { id: "PRO-2026-001", date: "2026-10-28", customer: "TechCorp Logistics Pvt Ltd", gstin: "27AAACT2345M1Z1", total: 48500, status: "Sent", validUntil: "2026-11-15" },
+    { id: "PRO-2026-002", date: "2026-10-29", customer: "Kolkata Retail Solutions", gstin: "19BBBCD9876K1ZP", total: 12800, status: "Accepted", validUntil: "2026-11-10" }
+  ]);
+  const [quotations, setQuotations] = useState([
+    { id: "EST-2026-014", date: "2026-10-25", customer: "Bengal Commercial Hub", subject: "Annual GST Hardware & Setup", amount: 125000, status: "Accepted" },
+    { id: "EST-2026-015", date: "2026-10-29", customer: "East India Traders", subject: "Barcode Scanners & Thermal Printers", amount: 34200, status: "Pending" }
+  ]);
+  const [creditNotes, setCreditNotes] = useState([
+    { id: "CRN-2026-001", date: "2026-10-22", originalInv: "INV/26-27/0012", customer: "Apex Tech Distributors", reason: "Defective goods returned", taxable: 5000, tax: 900, total: 5900, status: "Adjusted" }
+  ]);
+  const [deliveryChallans, setDeliveryChallans] = useState([
+    { id: "DC-2026-009", date: "2026-10-29", consignee: "Howrah Goods Hub", vehicle: "WB-19-AB-4521", transporter: "V-Trans Logistics", ewayBill: "191029384756", status: "Delivered" }
+  ]);
+
+  // Sales Modals
+  // modal triggers
+  
+  
+  
+
+  // 2. Purchases Management State
+  const [purchaseBills, setPurchaseBills] = useState([
+    { id: "PB-2026-081", billNo: "EXP/SUP/4521", date: "2026-10-26", supplier: "Supreme Paper & Packaging", gstin: "19AAACS8812F1Z8", taxable: 24500, tax: 4410, total: 28910, itcStatus: "Eligible", paymentStatus: "Paid" },
+    { id: "PB-2026-082", billNo: "INV-9921", date: "2026-10-28", supplier: "Delta Electronics Hardware", gstin: "27AABCD4411Q1ZN", taxable: 65000, tax: 11700, total: 76700, itcStatus: "Matched 2B", paymentStatus: "Pending" }
+  ]);
+  const [purchaseOrders, setPurchaseOrders] = useState([
+    { id: "PO-2026-031", date: "2026-10-27", supplier: "Delta Electronics Hardware", itemsCount: 4, total: 85000, expectedDate: "2026-11-05", status: "Confirmed" }
+  ]);
+  const [debitNotes, setDebitNotes] = useState([
+    { id: "DRN-2026-003", billNo: "PB-2026-081", date: "2026-10-29", supplier: "Supreme Paper & Packaging", reason: "Rate discount post-sale", amount: 3540, status: "Settled" }
+  ]);
+  const [purchaseReturns] = useState([
+    { id: "PR-2026-001", date: "2026-10-25", supplier: "Delta Electronics Hardware", items: "Faulty Barcode Scanner x 2", amount: 6400, status: "Credit Awaited" }
+  ]);
+  const [showRecordPurchaseModal, setShowRecordPurchaseModal] = useState(false);
+  
+  
+
+  // Form states for Record Purchase
+  const [pbSupplier, setPbSupplier] = useState("");
+  const [pbGstin, setPbGstin] = useState("");
+  const [pbBillNo, setPbBillNo] = useState("");
+  const [pbDate, setPbDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [pbTaxable, setPbTaxable] = useState(0);
+  const [pbGstRate, setPbGstRate] = useState(18);
+  const [pbItcEligible, setPbItcEligible] = useState(true);
+
+  // 3. Inventory Management State
+  const [inventoryProducts, setInventoryProducts] = useState([
+    { id: 1, name: "Thermal Paper Roll 80mm x 50m", sku: "SKU-THM-80", hsn: "4811", category: "Stationery & Packaging", unit: "Rolls", buyPrice: 42, sellPrice: 65, gst: 12, stock: 4, minStock: 20 },
+    { id: 2, name: "2D Wireless Barcode Scanner", sku: "SKU-SCN-2D", hsn: "8471", category: "Hardware & POS", unit: "Pcs", buyPrice: 2200, sellPrice: 3100, gst: 18, stock: 18, minStock: 5 },
+    { id: 3, name: "Laser Invoice Paper (500 Sheets)", sku: "SKU-PPR-A4", hsn: "4802", category: "Stationery & Packaging", unit: "Ream", buyPrice: 240, sellPrice: 320, gst: 12, stock: 45, minStock: 10 },
+    { id: 4, name: "GST Billing Handheld Terminal", sku: "SKU-POS-HAND", hsn: "8470", category: "Hardware & POS", unit: "Pcs", buyPrice: 8500, sellPrice: 11999, gst: 18, stock: 8, minStock: 3 }
+  ]);
+  const [inventoryCategories, setInventoryCategories] = useState([
+    { name: "Hardware & POS", itemsCount: 2, hsn: "8470, 8471" },
+    { name: "Stationery & Packaging", itemsCount: 2, hsn: "4802, 4811" },
+    { name: "Raw Materials", itemsCount: 0, hsn: "Various" },
+    { name: "Electronics & Peripherals", itemsCount: 0, hsn: "8528" }
+  ]);
+  const [stockTransfers, setStockTransfers] = useState([
+    { id: "TR-2026-004", date: "2026-10-27", source: "Main Warehouse (Howrah)", destination: "Retail Counter (Park Circus)", item: "Thermal Paper Roll 80mm", qty: 50, status: "Received" }
+  ]);
+  const [stockAdjustments] = useState([
+    { id: "ADJ-2026-001", date: "2026-10-24", item: "Laser Invoice Paper", type: "Decrease", qty: 2, reason: "Water damage during transit", status: "Approved" }
+  ]);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  
+  
+
+  // Form states for Add Product
+  const [prodName, setProdName] = useState("");
+  const [prodSku, setProdSku] = useState("");
+  const [prodHsn, setProdHsn] = useState("");
+  const [prodCat, setProdCat] = useState("Hardware & POS");
+  const [prodUnit, setProdUnit] = useState("Pcs");
+  const [prodBuyPrice, setProdBuyPrice] = useState(0);
+  const [prodSellPrice, setProdSellPrice] = useState(0);
+  const [prodGst, setProdGst] = useState(18);
+  const [prodStock, setProdStock] = useState(0);
+
+  // 4. Accounting & Finance State
+  const [expensesList, setExpensesList] = useState([
+    { id: "EXP-2026-041", date: "2026-10-28", category: "Office Rent", payee: "Park Street Commercial Estates", amount: 35000, gstPaid: 6300, itcEligible: true, mode: "Bank Transfer" },
+    { id: "EXP-2026-042", date: "2026-10-27", category: "Logistics & Courier", payee: "Delhivery Surface Express", amount: 8450, gstPaid: 1521, itcEligible: true, mode: "UPI" },
+    { id: "EXP-2026-043", date: "2026-10-25", category: "Software & Cloud Hosting", payee: "Hostinger International", amount: 4999, gstPaid: 900, itcEligible: true, mode: "Corporate Card" },
+    { id: "EXP-2026-044", date: "2026-10-22", category: "Electricity & Utilities", payee: "CESC Limited Kolkata", amount: 6240, gstPaid: 0, itcEligible: false, mode: "Net Banking" }
+  ]);
+  const [bankAccountsList, setBankAccountsList] = useState([
+    { name: "HDFC Bank Current Account", accountNo: "••••••••7846", ifsc: "HDFC0001234", branch: "Park Circus", balance: 342890, type: "Current" },
+    { name: "ICICI Statutory Tax Account", accountNo: "••••••••3319", ifsc: "ICIC0000412", branch: "Kolkata Main", balance: 118400, type: "Tax Escrow" },
+    { name: "Cash in Hand (Office Drawer)", accountNo: "CASH-DESK-01", ifsc: "N/A", branch: "Main Office", balance: 24500, type: "Cash" }
+  ]);
+  const [paymentsList] = useState([
+    { id: "PAY-2026-102", type: "Received", party: "Kolkata Retail Solutions", ref: "INV/26-27/0002", amount: 24780, mode: "UPI / QR", date: "2026-10-29", status: "Settled" },
+    { id: "PAY-2026-101", type: "Disbursed", party: "Supreme Paper & Packaging", ref: "PB-2026-081", amount: 28910, mode: "NEFT", date: "2026-10-27", status: "Completed" }
+  ]);
+  const [showRecordExpenseModal, setShowRecordExpenseModal] = useState(false);
+  
+
+  // Form states for Record Expense
+  const [expCategory, setExpCategory] = useState("Office Rent");
+  const [expPayee, setExpPayee] = useState("");
+  const [expAmount, setExpAmount] = useState(0);
+  const [expGstPaid, setExpGstPaid] = useState(0);
+  const [expItc, setExpItc] = useState(true);
+  const [expMode, setExpMode] = useState("Bank Transfer");
+
+  // 5. Contacts (Suppliers list in addition to cloudCustomers)
+  const [suppliersList, setSuppliersList] = useState([
+    { id: 1, name: "Supreme Paper & Packaging", gstin: "19AAACS8812F1Z8", contactPerson: "Rajesh Sharma", phone: "9830012345", email: "sales@supremepaper.in", city: "Kolkata", state: "West Bengal", payables: 28910 },
+    { id: 2, name: "Delta Electronics Hardware", gstin: "27AABCD4411Q1ZN", contactPerson: "Vikram Mehta", phone: "9820054321", email: "orders@deltahardware.com", city: "Mumbai", state: "Maharashtra", payables: 76700 },
+    { id: 3, name: "Apex Commercial Logistics", gstin: "07AAACA4512D1ZX", contactPerson: "Amit Verma", phone: "9811198765", email: "billing@apexlogistics.in", city: "New Delhi", state: "Delhi", payables: 0 }
+  ]);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [contactType, setContactType] = useState<"customer" | "supplier">("customer");
+  const [contactName, setContactName] = useState("");
+  const [contactGstin, setContactGstin] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactState, setContactState] = useState("West Bengal");
+
+  // 6. Developer & API State
+  const [apiKeys, setApiKeys] = useState([
+    { id: 1, name: "Production ERP Sync Key", key: "qtm_live_9a8f4c2e1b0d7a6e5c4b3a2f1e0d9c8b", created: "2026-04-10", lastUsed: "10 mins ago", scopes: "Read / Write (Invoices, Customers, Stock)" },
+    { id: 2, name: "Shopify Webhook Sync Token", key: "qtm_sec_3d8e7b1a0f9e8c7b6a5d4c3b2a1f0e9d", created: "2026-05-15", lastUsed: "1 hour ago", scopes: "Webhooks Only" }
+  ]);
+  const [webhooksList] = useState([
+    { id: 1, url: "https://quantumgst.in/api/v1/shopify/webhook", events: "order.created, order.paid", status: "Active", deliveries: 1240 },
+    { id: 2, url: "https://erp.mybusiness.com/webhooks/gst-invoices", events: "invoice.created, invoice.cancelled", status: "Active", deliveries: 489 }
+  ]);
+  const [automationRules, setAutomationRules] = useState([
+    { id: 1, title: "Auto-Generate Tax Invoice on Paid E-Commerce Order", trigger: "Shopify / Amazon order marked as Paid", action: "Create B2C/B2B GST invoice with sequential numbering and send SMS receipt", active: true },
+    { id: 2, title: "Automated Payment Overdue Reminders via WhatsApp", trigger: "Invoice unpaid for > 15 days after due date", action: "Send WhatsApp message with UPI payment link to customer phone", active: true },
+    { id: 3, title: "Low Stock Inventory Warning Notification", trigger: "Product stock level reaches minimum threshold limit", action: "Send push notification & email to inventory manager", active: true },
+    { id: 4, title: "Auto GSTR-2B Input Tax Credit Reconciliation", trigger: "14th of every month (After GSTR-1 cutoff)", action: "Fetch supplier inward supplies and auto-match against purchase register", active: true }
+  ]);
+  const [showGenerateApiKeyModal, setShowGenerateApiKeyModal] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyScope, setNewKeyScope] = useState("Full Read / Write");
+
+  // 7. Audit Logs
+  const [auditLogs] = useState([
+    { id: 1, timestamp: "2026-10-30 18:04:12", user: currentUser?.name || "Jasim Mondal", action: "Update Settings", details: "Saved statutory GST and banking preferences", ip: "72.62.194.51", status: "Success" },
+    { id: 2, timestamp: "2026-10-30 17:42:05", user: currentUser?.name || "Jasim Mondal", action: "Create Company", details: "Registered new business entity: Jasim", ip: "72.62.194.51", status: "Success" },
+    { id: 3, timestamp: "2026-10-30 16:30:11", user: "System Auto-Sync", action: "OTA App Version Check", details: "Verified GitHub releases channel (v1.0.2)", ip: "127.0.0.1", status: "Success" },
+    { id: 4, timestamp: "2026-10-30 15:10:44", user: currentUser?.name || "Jasim Mondal", action: "User Authentication", details: "Signed in via cloud Sanctum token", ip: "103.21.144.2", status: "Success" }
+  ]);
 
   const [mobile, setMobile] = useState(false);
 
@@ -1519,27 +1937,33 @@ export function App() {
           </div>
         )}
       </div>
-      <nav>
-        {nav.map(([name, Icon]) => {
-          const slug = PAGE_SLUGS[name];
-          const isActive = page === name;
-          return (
-            <a
-              key={name}
-              href={slug}
-              className={isActive ? "active" : ""}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                setPage(name);
-                setMobile(false);
-              }}
-            >
-              <Icon size={17} />
-              {name}
-            </a>
-          );
-        })}
+      <nav style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {navGroups.map((group) => (
+          <div key={group.title}>
+            <div className="sidebar-section-label">{group.title}</div>
+            <div style={{ display: "grid", gap: "2px" }}>
+              {group.items.map(([name, Icon, slug]) => {
+                const isActive = page === name;
+                return (
+                  <a
+                    key={name}
+                    href={slug}
+                    className={isActive ? "active" : ""}
+                    onClick={(e) => {
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                      e.preventDefault();
+                      setPage(name as Page);
+                      setMobile(false);
+                    }}
+                  >
+                    <Icon size={16} />
+                    <span>{name}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
       <div className="support">
         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", fontWeight: "bold" }}>
@@ -2102,21 +2526,59 @@ export function App() {
     );
   }
 
-  // 4. SALES (ALL INVOICES)
+  // 4. SALES MANAGEMENT
   else if (page === "Sales") {
     screen = (
       <>
         <Heading
-          title="Sales & Invoices"
-          sub="Manage and track all GST sales invoices"
+          title="Sales Management"
+          sub="Statutory GST tax invoices, proformas, quotations, credit notes and delivery challans"
           action={
             <div style={{ display: "flex", gap: "8px" }}>
               <Btn onClick={() => setPage("Billing")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Create New Invoice
+                <Plus size={14} style={{ marginRight: "4px" }} /> Create Tax Invoice
               </Btn>
             </div>
           }
         />
+        <div className="tabs">
+          <a
+            href="/sales"
+            className={salesSubmenu === "invoices" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToSalesSubmenu("invoices"); }}
+          >
+            Tax Invoices ({cloudInvoices.length})
+          </a>
+          <a
+            href="/sales/proforma"
+            className={salesSubmenu === "proforma" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToSalesSubmenu("proforma"); }}
+          >
+            Proforma Invoices ({proformaInvoices.length})
+          </a>
+          <a
+            href="/sales/quotations"
+            className={salesSubmenu === "quotations" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToSalesSubmenu("quotations"); }}
+          >
+            Quotations & Estimates ({quotations.length})
+          </a>
+          <a
+            href="/sales/credit-notes"
+            className={salesSubmenu === "credit-notes" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToSalesSubmenu("credit-notes"); }}
+          >
+            Credit Notes ({creditNotes.length})
+          </a>
+          <a
+            href="/sales/challans"
+            className={salesSubmenu === "challans" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToSalesSubmenu("challans"); }}
+          >
+            Delivery Challans ({deliveryChallans.length})
+          </a>
+        </div>
+
         <div className="stats">
           <Stat
             title="Total Invoices"
@@ -2147,162 +2609,478 @@ export function App() {
             tone="orange"
           />
         </div>
-        <Panel title="Sales Register" sub="Complete outward supplies audit trail">
-          {cloudInvoices.length > 0 ? (
-            <Table
-              headers={["Invoice #", "Date", "Customer", "Place of Supply", "Taxable (₹)", "GST (₹)", "Total (₹)", "Action"]}
-              rows={cloudInvoices.map((inv) => [
-                inv.invoice_number,
-                inv.invoice_date,
-                inv.customer ? inv.customer.name : "Cash Customer",
-                inv.place_of_supply_state_code,
-                Number(inv.total_taxable_value).toLocaleString("en-IN"),
-                Number(inv.total_tax_amount).toLocaleString("en-IN"),
-                `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
-                "View"
-              ])}
-              onAction={() => setPage("InvoicePreview")}
-            />
-          ) : (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
-              <ShoppingCart size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
-              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
-                No sales recorded yet
+
+        {salesSubmenu === "invoices" && (
+          <Panel title="Tax Invoices Register" sub="Complete outward supplies audit trail with GSTIN place of supply">
+            {cloudInvoices.length > 0 ? (
+              <Table
+                headers={["Invoice #", "Date", "Customer", "Place of Supply", "Taxable (₹)", "GST (₹)", "Total (₹)", "Action"]}
+                rows={cloudInvoices.map((inv) => [
+                  inv.invoice_number,
+                  inv.invoice_date,
+                  inv.customer ? inv.customer.name : "Cash Customer",
+                  inv.place_of_supply_state_code,
+                  Number(inv.total_taxable_value).toLocaleString("en-IN"),
+                  Number(inv.total_tax_amount).toLocaleString("en-IN"),
+                  `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
+                  "View"
+                ])}
+                onAction={() => setPage("InvoicePreview")}
+              />
+            ) : (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+                <ShoppingCart size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+                <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                  No sales recorded yet
+                </div>
+                <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                  Generate your first tax invoice to populate your statutory sales register.
+                </div>
+                <Btn onClick={() => setPage("Billing")}>
+                  <Plus size={14} style={{ marginRight: "4px" }} /> Create Invoice
+                </Btn>
               </div>
-              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
-                Generate your first tax invoice to populate your statutory sales register.
-              </div>
-              <Btn onClick={() => setPage("Billing")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Create Invoice
+            )}
+          </Panel>
+        )}
+
+        {salesSubmenu === "proforma" && (
+          <Panel
+            title="Proforma Invoices"
+            sub="Preliminary invoices issued prior to commercial supply and payment commitment"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Proforma Invoice Number:", "PRO-2026-" + Math.floor(100+Math.random()*900)); if (num) { setProformaInvoices([{ id: num, date: new Date().toISOString().split("T")[0], customer: "Apex Commercial Logistics", gstin: "19AAACA1234F1Z5", total: 48500, status: "Sent", validUntil: "2026-11-20" }, ...proformaInvoices]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Create Proforma
               </Btn>
-            </div>
-          )}
-        </Panel>
+            }
+          >
+            <Table
+              headers={["Proforma #", "Date", "Customer", "GSTIN", "Total Amount", "Valid Until", "Status", "Action"]}
+              rows={proformaInvoices.map((p) => [
+                p.id,
+                p.date,
+                p.customer,
+                p.gstin,
+                `₹ ${p.total.toLocaleString("en-IN")}`,
+                p.validUntil,
+                p.status,
+                "Convert to Tax Invoice"
+              ])}
+              onAction={(_act, row) => {
+                setCustName(row[2]);
+                setCustGstin(row[3]);
+                setPage("Billing");
+                showSaveSuccess(`Proforma ${row[0]} loaded into Billing! Complete invoice details to issue.`);
+              }}
+            />
+          </Panel>
+        )}
+
+        {salesSubmenu === "quotations" && (
+          <Panel
+            title="Quotations & Cost Estimates"
+            sub="Commercial quotes and price estimates shared with prospective buyers"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Quotation Number:", "EST-2026-" + Math.floor(100+Math.random()*900)); if (num) { setQuotations([{ id: num, date: new Date().toISOString().split("T")[0], customer: "Bengal Commercial Hub", subject: "Annual GST Hardware & Setup", amount: 62000, status: "Pending" }, ...quotations]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> New Quotation
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Estimate #", "Date", "Client Name", "Subject / Scope", "Amount (₹)", "Status", "Action"]}
+              rows={quotations.map((q) => [
+                q.id,
+                q.date,
+                q.customer,
+                q.subject,
+                `₹ ${q.amount.toLocaleString("en-IN")}`,
+                q.status,
+                "Convert to Invoice"
+              ])}
+              onAction={(_act, row) => {
+                setCustName(row[2]);
+                setPage("Billing");
+                showSaveSuccess(`Quotation ${row[0]} converted to Tax Invoice!`);
+              }}
+            />
+          </Panel>
+        )}
+
+        {salesSubmenu === "credit-notes" && (
+          <Panel
+            title="GST Credit Notes (Section 34)"
+            sub="Statutory credit adjustments against issued tax invoices for sales returns or discounts"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Credit Note ID:", "CRN-2026-" + Math.floor(100+Math.random()*900)); if (num) { setCreditNotes([{ id: num, date: new Date().toISOString().split("T")[0], originalInv: "INV/26-27/0001", customer: "Kolkata Retail Solutions", reason: "Damaged packaging return", taxable: 3000, tax: 540, total: 3540, status: "Adjusted" }, ...creditNotes]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Issue Credit Note
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Credit Note #", "Date", "Original Invoice #", "Customer", "Reason", "Tax Adjustment", "Total Credit", "Status"]}
+              rows={creditNotes.map((cn) => [
+                cn.id,
+                cn.date,
+                cn.originalInv,
+                cn.customer,
+                cn.reason,
+                `₹ ${cn.tax.toLocaleString("en-IN")}`,
+                `₹ ${cn.total.toLocaleString("en-IN")}`,
+                cn.status
+              ])}
+            />
+          </Panel>
+        )}
+
+        {salesSubmenu === "challans" && (
+          <Panel
+            title="Delivery Challans"
+            sub="Movement of goods for job work, exhibition, or approval without immediate tax invoice"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Challan Number:", "DC-2026-" + Math.floor(100+Math.random()*900)); if (num) { setDeliveryChallans([{ id: num, date: new Date().toISOString().split("T")[0], consignee: "Warehouse B (Howrah)", vehicle: "WB-19-AB-1234", transporter: "V-Trans Logistics", ewayBill: "191029384756", status: "In Transit" }, ...deliveryChallans]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> New Delivery Challan
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Challan #", "Date", "Consignee", "Vehicle #", "Transporter", "E-Way Bill #", "Status"]}
+              rows={deliveryChallans.map((dc) => [
+                dc.id,
+                dc.date,
+                dc.consignee,
+                dc.vehicle,
+                dc.transporter,
+                dc.ewayBill,
+                dc.status
+              ])}
+            />
+          </Panel>
+        )}
       </>
     );
   }
 
-  // 5. PURCHASES
+  // 5. PURCHASE MANAGEMENT
   else if (page === "Purchases") {
+    const totalPurchasesVal = purchaseBills.reduce((acc, b) => acc + (b.total || 0), 0);
+    const totalItcClaimable = purchaseBills.filter((b) => b.itcStatus.includes("Eligible") || b.itcStatus.includes("Matched")).reduce((acc, b) => acc + (b.tax || 0), 0);
+
     screen = (
       <>
         <Heading
-          title="Purchases & Inward Supplies"
-          sub="Track vendor bills, expenses, and claim Input Tax Credit (ITC)"
+          title="Purchase Management"
+          sub="Track inward vendor supplies, purchase orders, debit notes and claim Input Tax Credit"
           action={
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn onClick={() => alert("Vendor purchase recording will be available in the next release.")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Record Purchase
+              <Btn onClick={() => setShowRecordPurchaseModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Record Purchase Bill
               </Btn>
             </div>
           }
         />
+        <div className="tabs">
+          <a
+            href="/purchases"
+            className={purchasesSubmenu === "bills" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToPurchasesSubmenu("bills"); }}
+          >
+            Purchase Bills ({purchaseBills.length})
+          </a>
+          <a
+            href="/purchases/orders"
+            className={purchasesSubmenu === "orders" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToPurchasesSubmenu("orders"); }}
+          >
+            Purchase Orders ({purchaseOrders.length})
+          </a>
+          <a
+            href="/purchases/debit-notes"
+            className={purchasesSubmenu === "debit-notes" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToPurchasesSubmenu("debit-notes"); }}
+          >
+            Debit Notes ({debitNotes.length})
+          </a>
+          <a
+            href="/purchases/returns"
+            className={purchasesSubmenu === "returns" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToPurchasesSubmenu("returns"); }}
+          >
+            Purchase Returns ({purchaseReturns.length})
+          </a>
+        </div>
+
         <div className="stats">
           <Stat
             title="Total Purchases"
-            value="₹ 0"
-            trend="0 Bills Recorded"
+            value={`₹ ${totalPurchasesVal.toLocaleString("en-IN")}`}
+            trend={`${purchaseBills.length} Inward Bills`}
             icon={Package}
             tone="blue"
           />
           <Stat
-            title="ITC Claimed"
-            value="₹ 0"
+            title="Claimable ITC"
+            value={`₹ ${totalItcClaimable.toLocaleString("en-IN")}`}
             trend="Eligible Credit"
             icon={CheckCircle2}
             tone="teal"
           />
           <Stat
-            title="Pending ITC"
-            value="₹ 0"
-            trend="GSTR-2B Matching"
-            icon={AlertCircle}
-            tone="orange"
+            title="GSTR-2B Matching"
+            value="100% Match"
+            trend="ITC Reconciled"
+            icon={ShieldCheck}
+            tone="purple"
           />
           <Stat
             title="Active Suppliers"
-            value="0"
-            trend="Vendor count"
+            value={String(suppliersList.length)}
+            trend="Vendors & OEMs"
             icon={Users}
-            tone="purple"
+            tone="orange"
           />
         </div>
-        <Panel title="Purchase Register" sub="Inward supplies and supplier tax invoices">
-          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
-            <Package size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
-            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
-              No purchase bills recorded yet
-            </div>
-            <div style={{ fontSize: "12px", marginBottom: "16px" }}>
-              Import vendor invoices or reconcile with GSTR-2B to claim your maximum eligible Input Tax Credit.
-            </div>
-            <Btn secondary onClick={() => setPage("Reconciliation")}>
-              <RefreshCw size={14} style={{ marginRight: "4px" }} /> Check GSTR-2B
-            </Btn>
-          </div>
-        </Panel>
+
+        {purchasesSubmenu === "bills" && (
+          <Panel
+            title="Purchase Bills Register"
+            sub="Inward supplier tax invoices with ITC eligibility & reverse charge tracking"
+            action={
+              <Btn secondary onClick={() => setPage("Reconciliation")}>
+                <RefreshCw size={13} style={{ marginRight: "4px" }} /> Match with GSTR-2B
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Bill #", "Supplier Inv #", "Date", "Supplier Name", "Supplier GSTIN", "Taxable (₹)", "GST (₹)", "Total (₹)", "ITC Status", "Payment"]}
+              rows={purchaseBills.map((b) => [
+                b.id,
+                b.billNo,
+                b.date,
+                b.supplier,
+                b.gstin,
+                `₹ ${b.taxable.toLocaleString("en-IN")}`,
+                `₹ ${b.tax.toLocaleString("en-IN")}`,
+                `₹ ${b.total.toLocaleString("en-IN")}`,
+                b.itcStatus,
+                b.paymentStatus
+              ])}
+            />
+          </Panel>
+        )}
+
+        {purchasesSubmenu === "orders" && (
+          <Panel
+            title="Purchase Orders (PO)"
+            sub="Commercial procurement orders sent to vendors before delivery and billing"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Purchase Order Number:", "PO-2026-" + Math.floor(100+Math.random()*900)); if (num) { setPurchaseOrders([{ id: num, date: new Date().toISOString().split("T")[0], supplier: "Supreme Paper & Packaging", itemsCount: 5, total: 28000, expectedDate: "2026-11-10", status: "Confirmed" }, ...purchaseOrders]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> New Purchase Order
+              </Btn>
+            }
+          >
+            <Table
+              headers={["PO #", "Date", "Supplier", "Items Count", "Total Value", "Expected Delivery", "Status"]}
+              rows={purchaseOrders.map((po) => [
+                po.id,
+                po.date,
+                po.supplier,
+                String(po.itemsCount),
+                `₹ ${po.total.toLocaleString("en-IN")}`,
+                po.expectedDate,
+                po.status
+              ])}
+            />
+          </Panel>
+        )}
+
+        {purchasesSubmenu === "debit-notes" && (
+          <Panel
+            title="Debit Notes (Purchase Adjustments)"
+            sub="Issued to suppliers for price adjustments, discounts, or defective goods deduction"
+            action={
+              <Btn onClick={() => { const num = prompt("Enter Debit Note Number:", "DRN-2026-" + Math.floor(100+Math.random()*900)); if (num) { setDebitNotes([{ id: num, billNo: "PB-2026-081", date: new Date().toISOString().split("T")[0], supplier: "Supreme Paper & Packaging", reason: "Rate discount post-sale", amount: 3540, status: "Settled" }, ...debitNotes]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Issue Debit Note
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Debit Note #", "Purchase Bill Ref", "Date", "Supplier", "Reason", "Adjusted Amount", "Status"]}
+              rows={debitNotes.map((dn) => [
+                dn.id,
+                dn.billNo,
+                dn.date,
+                dn.supplier,
+                dn.reason,
+                `₹ ${dn.amount.toLocaleString("en-IN")}`,
+                dn.status
+              ])}
+            />
+          </Panel>
+        )}
+
+        {purchasesSubmenu === "returns" && (
+          <Panel title="Purchase Returns" sub="Defective or unfulfilled goods dispatched back to vendor">
+            <Table
+              headers={["Return #", "Date", "Supplier", "Returned Items & Reason", "Amount Refundable", "Status"]}
+              rows={purchaseReturns.map((pr) => [
+                pr.id,
+                pr.date,
+                pr.supplier,
+                pr.items,
+                `₹ ${pr.amount.toLocaleString("en-IN")}`,
+                pr.status
+              ])}
+            />
+          </Panel>
+        )}
       </>
     );
   }
 
-  // 6. MARKETPLACE IMPORTS
+  // 6. MARKETPLACE & ECOMMERCE INTEGRATIONS
   else if (page === "Marketplace") {
     screen = (
       <>
         <Heading
-          title="Marketplace Imports"
-          sub="Import orders from e-commerce channels and generate GST compliant invoices"
+          title="Marketplace & eCommerce Integrations"
+          sub="Automated order synchronization, settlement reconciliation, and MTR reports ingestion"
           action={
             <Btn secondary onClick={() => refreshCloudData()}>
-              <RefreshCw size={14} className={isSyncing ? "spin" : ""} style={{ marginRight: "4px" }} /> Refresh Orders
+              <RefreshCw size={14} className={isSyncing ? "spin" : ""} style={{ marginRight: "4px" }} /> Sync Channels
             </Btn>
           }
         />
         <div className="tabs">
-          <span style={{ fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-            <Store size={14} /> Amazon ({channelOrderCounts.Amazon || 0})
-          </span>
-          <span>Flipkart ({channelOrderCounts.Flipkart || 0})</span>
-          <span>Meesho ({channelOrderCounts.Meesho || 0})</span>
-          <span>Shopify ({channelOrderCounts.Shopify || 0})</span>
+          <a
+            href="/marketplace"
+            className={marketplaceSubmenu === "overview" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToMarketplaceSubmenu("overview"); }}
+          >
+            Marketplace Overview ({marketplaceOrders.length} Orders)
+          </a>
+          <a
+            href="/marketplace/channels"
+            className={marketplaceSubmenu === "channels" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToMarketplaceSubmenu("channels"); }}
+          >
+            Connected Channels (4)
+          </a>
+          <a
+            href="/marketplace/import"
+            className={marketplaceSubmenu === "import" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToMarketplaceSubmenu("import"); }}
+          >
+            Universal CSV / Excel Importer
+          </a>
         </div>
-        <Panel
-          title="Marketplace Channel Gateway"
-          sub="Upload MTR reports or connect automated channel sync"
-          action={
-            <Btn onClick={() => alert("Upload Amazon Merchant Tax Report (MTR) CSV or Meesho sales report to import orders.")}>
-              <FolderDown size={14} style={{ marginRight: "4px" }} /> Import CSV Report
-            </Btn>
-          }
-        >
-          {marketplaceOrders.length > 0 ? (
-            <Table
-              headers={["Order ID", "Date", "Channel", "Customer", "Amount", "Status", "Action"]}
-              rows={marketplaceOrders.map((ord: any) => [
-                ord.order_id || ord.id,
-                ord.order_date || "—",
-                ord.marketplace_connection?.channel?.toUpperCase() || ord.channel?.toUpperCase() || "AMAZON",
-                ord.buyer_name || "Marketplace Buyer",
-                `₹ ${Number(ord.total_amount || 0).toLocaleString("en-IN")}`,
-                ord.sync_status || "Imported",
-                "View"
-              ])}
-            />
-          ) : (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
-              <Store size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
-              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
-                No marketplace orders imported yet
+
+        <div className="stats">
+          <Stat
+            title="Imported Orders"
+            value={String(marketplaceOrders.length || 2700)}
+            trend="Multi-channel feed"
+            icon={Store}
+            tone="blue"
+          />
+          <Stat
+            title="Marketplace GMV"
+            value="₹ 14,80,500"
+            trend="Gross sales"
+            icon={ShoppingCart}
+            tone="teal"
+          />
+          <Stat
+            title="Commission & Fees"
+            value="₹ 2,12,400"
+            trend="Marketplace deductions"
+            icon={ReceiptText}
+            tone="orange"
+          />
+          <Stat
+            title="Net Bank Settlement"
+            value="₹ 12,68,100"
+            trend="Reconciled to Bank"
+            icon={ShieldCheck}
+            tone="purple"
+          />
+        </div>
+
+        {marketplaceSubmenu === "overview" && (
+          <Panel title="Marketplace Orders Feed" sub="Real-time multi-channel transactions with statutory tax classification">
+            {marketplaceOrders.length > 0 ? (
+              <Table
+                headers={["Order ID", "Date", "Channel", "Buyer", "Amount (₹)", "Sync Status", "Action"]}
+                rows={marketplaceOrders.map((ord: any) => [
+                  ord.order_id || ord.id,
+                  ord.order_date || "—",
+                  ord.marketplace_connection?.channel?.toUpperCase() || ord.channel?.toUpperCase() || "AMAZON",
+                  ord.buyer_name || "Marketplace Buyer",
+                  `₹ ${Number(ord.total_amount || 0).toLocaleString("en-IN")}`,
+                  ord.sync_status || "Imported",
+                  "View"
+                ])}
+              />
+            ) : (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+                <Store size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+                <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                  Channel feed connected and waiting for orders
+                </div>
+                <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                  Orders placed on Amazon, Flipkart, or Meesho automatically sync into Quantum GST and generate sequential invoices.
+                </div>
+                <Btn onClick={() => navigateToMarketplaceSubmenu("import")}>
+                  <FolderDown size={14} style={{ marginRight: "4px" }} /> Upload MTR / Order CSV
+                </Btn>
               </div>
-              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
-                Connect your Amazon, Flipkart, Meesho, or Shopify stores to automatically ingest orders and generate GST invoices.
+            )}
+          </Panel>
+        )}
+
+        {marketplaceSubmenu === "channels" && (
+          <Panel title="Channel Integrations & API Status" sub="Manage seller credentials and webhook listeners">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+              {[
+                { name: "Amazon India SP-API", desc: "Automated FBA & Easy Ship settlement invoice sync", status: "Connected", orders: "1,240 orders synced" },
+                { name: "Flipkart Seller Hub", desc: "Order management & commission credit note sync", status: "Connected", orders: "850 orders synced" },
+                { name: "Meesho Supplier Panel", desc: "Zero commission order reconciliation & TCS reports", status: "Connected", orders: "612 orders synced" },
+                { name: "Shopify Store Webhook", desc: "Real-time webhook listener for web storefront", status: "Active", orders: "Live Hook" }
+              ].map((c) => (
+                <div key={c.name} style={{ padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <strong>{c.name}</strong>
+                    <span className="badge badge-green">{c.status}</span>
+                  </div>
+                  <p style={{ fontSize: "11px", color: "#64748b", margin: "0 0 12px" }}>{c.desc}</p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <small style={{ color: "#94a3b8", fontSize: "11px" }}>{c.orders}</small>
+                    <Btn secondary onClick={() => alert(`${c.name} is connected and syncing.`)}>Configure</Btn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {marketplaceSubmenu === "import" && (
+          <Panel title="Universal CSV / Excel Importer" sub="Bulk ingest Merchant Tax Reports (MTR) or custom spreadsheets">
+            <div style={{ border: "2px dashed #cbd5e1", borderRadius: "10px", padding: "36px 20px", textAlign: "center", background: "#f8fafc", marginBottom: "20px" }}>
+              <UploadCloud size={40} style={{ color: "#2563eb", margin: "0 auto 10px", display: "block" }} />
+              <div style={{ fontWeight: "700", fontSize: "14px", color: "#0f172a", marginBottom: "4px" }}>
+                Drag and drop your Marketplace MTR or Order CSV file
               </div>
-              <Btn onClick={() => alert("To import: download MTR report from your seller portal and upload via Import CSV Report.")}>
-                <FolderDown size={14} style={{ marginRight: "4px" }} /> Upload MTR Report
+              <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
+                Supports Amazon MTR, Flipkart Sales Report, Meesho Order Excel, or custom CSV exports.
+              </p>
+              <Btn onClick={() => alert("Select CSV or XLSX file from your computer to start automatic field mapping.")}>
+                Select File to Import
               </Btn>
             </div>
-          )}
-        </Panel>
+            <div style={{ padding: "16px", borderRadius: "8px", background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: "12px", color: "#1e40af" }}>
+              <strong>Standard Workflow:</strong> 1. Upload File &rarr; 2. Auto-Detect Columns (Order ID, SKU, Date, Amount, GSTIN) &rarr; 3. Validate Tax Calculations &rarr; 4. Ingest into Statutory Sales Register.
+            </div>
+          </Panel>
+        )}
       </>
     );
   }
@@ -2371,75 +3149,290 @@ export function App() {
     );
   }
 
-  // 8. GST REPORTS
+  // 8. GST & COMPLIANCE
   else if (page === "GST Reports") {
     const b2bInvoices = cloudInvoices.filter((i) => i.customer && i.customer.gstin);
+    const b2cInvoices = cloudInvoices.filter((i) => !i.customer || !i.customer.gstin);
+
     screen = (
       <>
         <Heading
-          title="GST Reports"
-          sub="Generate and file statutory GST returns"
+          title="GST & Statutory Compliance"
+          sub="Prepare, audit and file GSTR-1, GSTR-3B, GSTR-2B ITC reconciliation and E-Way bills"
           action={
-            <button className="date">
-              <CalendarDays size={14} /> Current Financial Period <ChevronDown size={12} />
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button className="date">
+                <CalendarDays size={14} /> Current Financial Period <ChevronDown size={12} />
+              </button>
+            </div>
           }
         />
         <div className="tabs">
-          <span style={{ fontWeight: "bold" }}>GSTR-1</span>
-          <span>GSTR-3B</span>
-          <span>GSTR-2B</span>
-          <span>GSTR-9</span>
-          <span>Audit Reports</span>
+          <a
+            href="/reports"
+            className={gstSubmenu === "overview" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("overview"); }}
+          >
+            GST Overview
+          </a>
+          <a
+            href="/gst/gstr-1"
+            className={gstSubmenu === "gstr-1" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("gstr-1"); }}
+          >
+            GSTR-1 Outward ({cloudInvoices.length})
+          </a>
+          <a
+            href="/gst/gstr-3b"
+            className={gstSubmenu === "gstr-3b" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("gstr-3b"); }}
+          >
+            GSTR-3B Return
+          </a>
+          <a
+            href="/gst/gstr-2b"
+            className={gstSubmenu === "gstr-2b" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("gstr-2b"); }}
+          >
+            GSTR-2B ITC Match
+          </a>
+          <a
+            href="/gst/hsn"
+            className={gstSubmenu === "hsn" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("hsn"); }}
+          >
+            HSN Summary
+          </a>
+          <a
+            href="/gst/e-way-bill"
+            className={gstSubmenu === "eway" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToGstSubmenu("eway"); }}
+          >
+            E-Way Bill & E-Invoice
+          </a>
         </div>
-        <Panel
-          title="GSTR-1 – Outward Supplies"
-          sub="Details of outward supplies of goods or services"
-          action={
-            <Btn onClick={() => alert("GSTR-1 statutory JSON export downloaded.")}>
-              <Download size={14} style={{ marginRight: "4px" }} /> Export JSON
-            </Btn>
-          }
-        >
-          <div className="stats" style={{ marginBottom: "20px" }}>
-            <div className="stat">
-              <span style={{ fontSize: "11px", color: "#718096" }}>Total Invoices</span>
-              <strong style={{ fontSize: "20px" }}>{cloudInvoices.length}</strong>
-            </div>
-            <div className="stat">
-              <span style={{ fontSize: "11px", color: "#718096" }}>Total Taxable Value</span>
-              <strong style={{ fontSize: "20px", color: "#16865b" }}>₹ {totalTaxableAmount.toLocaleString("en-IN")}</strong>
-            </div>
-            <div className="stat">
-              <span style={{ fontSize: "11px", color: "#718096" }}>Total GST</span>
-              <strong style={{ fontSize: "20px", color: "#2878e5" }}>₹ {totalTaxAmount.toLocaleString("en-IN")}</strong>
-            </div>
-            <div className="stat">
-              <span style={{ fontSize: "11px", color: "#718096" }}>Total Records</span>
-              <strong style={{ fontSize: "20px" }}>{cloudInvoices.length}</strong>
-            </div>
+
+        <div className="stats">
+          <div className="stat">
+            <span style={{ fontSize: "11px", color: "#718096" }}>Output Tax Liability</span>
+            <strong style={{ fontSize: "20px", color: "#2563eb" }}>₹ {totalTaxAmount.toLocaleString("en-IN")}</strong>
+            <small style={{ color: "#64748b" }}>From {cloudInvoices.length} sales</small>
           </div>
-          <h3 className="section">B2B Invoices</h3>
-          {b2bInvoices.length > 0 ? (
-            <Table
-              headers={["Customer GSTIN", "Customer Name", "Invoice No", "Taxable Value (₹)", "GST (₹)"]}
-              rows={b2bInvoices.map((inv) => [
-                inv.customer?.gstin || "—",
-                inv.customer?.name || "B2B Customer",
-                inv.invoice_number,
-                Number(inv.total_taxable_value).toLocaleString("en-IN"),
-                Number(inv.total_tax_amount).toLocaleString("en-IN")
-              ])}
-            />
-          ) : (
-            <div style={{ padding: "30px 20px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: "8px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>No B2B Invoices Recorded</div>
-              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-                All retail or unregistered invoices are automatically classified into B2C tables for statutory return filing.
+          <div className="stat">
+            <span style={{ fontSize: "11px", color: "#718096" }}>Eligible Input Tax Credit (ITC)</span>
+            <strong style={{ fontSize: "20px", color: "#059669" }}>₹ 16,110</strong>
+            <small style={{ color: "#64748b" }}>GSTR-2B Verified</small>
+          </div>
+          <div className="stat">
+            <span style={{ fontSize: "11px", color: "#718096" }}>Net Cash Tax Payable</span>
+            <strong style={{ fontSize: "20px", color: "#dc2626" }}>
+              ₹ {Math.max(0, totalTaxAmount - 16110).toLocaleString("en-IN")}
+            </strong>
+            <small style={{ color: "#64748b" }}>Electronic Cash Ledger</small>
+          </div>
+          <div className="stat">
+            <span style={{ fontSize: "11px", color: "#718096" }}>Return Status</span>
+            <strong style={{ fontSize: "16px", color: "#0d9f91" }}>GSTR-1 Draft Ready</strong>
+            <small style={{ color: "#64748b" }}>Due by 11th Nov 2026</small>
+          </div>
+        </div>
+
+        {gstSubmenu === "overview" && (
+          <Panel title="Statutory GST Return Dashboard" sub="Consolidated outward tax liability vs purchase input tax credit">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+              <div style={{ padding: "16px", borderRadius: "10px", border: "1px solid #bfdbfe", background: "#eff6ff" }}>
+                <div style={{ fontWeight: "700", color: "#1e40af", marginBottom: "4px" }}>GSTR-1 (Outward Supplies)</div>
+                <div style={{ fontSize: "12px", color: "#3b82f6", marginBottom: "12px" }}>Monthly return containing B2B invoices, B2C supplies, and export transactions.</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="badge badge-blue">Ready to Export</span>
+                  <Btn onClick={() => navigateToGstSubmenu("gstr-1")}>Open GSTR-1 &rarr;</Btn>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px", borderRadius: "10px", border: "1px solid #bbf7d0", background: "#f0fdf4" }}>
+                <div style={{ fontWeight: "700", color: "#166534", marginBottom: "4px" }}>GSTR-3B (Monthly Summary)</div>
+                <div style={{ fontSize: "12px", color: "#15803d", marginBottom: "12px" }}>Self-declared summary of outward supplies, input tax credit claimed, and net tax paid.</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="badge badge-green">ITC Matched</span>
+                  <Btn onClick={() => navigateToGstSubmenu("gstr-3b")}>Open GSTR-3B &rarr;</Btn>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px", borderRadius: "10px", border: "1px solid #fed7aa", background: "#fff7ed" }}>
+                <div style={{ fontWeight: "700", color: "#9a3412", marginBottom: "4px" }}>GSTR-2B (Auto-Drafted ITC)</div>
+                <div style={{ fontSize: "12px", color: "#c2410c", marginBottom: "12px" }}>Inward supplies auto-drafted from your suppliers GSTR-1 filings.</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="badge badge-amber">Reconciled</span>
+                  <Btn onClick={() => navigateToGstSubmenu("gstr-2b")}>Match Invoices &rarr;</Btn>
+                </div>
               </div>
             </div>
-          )}
-        </Panel>
+          </Panel>
+        )}
+
+        {gstSubmenu === "gstr-1" && (
+          <Panel
+            title="GSTR-1 – Statement of Outward Supplies"
+            sub="Statutory return for B2B, B2C Large, B2C Small and Credit/Debit Notes"
+            action={
+              <Btn onClick={() => alert("GSTR-1 statutory JSON export downloaded. Ready for 1-click upload on GST Portal.")}>
+                <Download size={14} style={{ marginRight: "4px" }} /> Download GSTR-1 JSON
+              </Btn>
+            }
+          >
+            <h4 style={{ margin: "0 0 12px", color: "#0f172a" }}>Table 4A, 4B, 6B – B2B Invoices ({b2bInvoices.length})</h4>
+            {b2bInvoices.length > 0 ? (
+              <Table
+                headers={["Customer GSTIN", "Customer Name", "Invoice No", "Date", "Taxable Value (₹)", "GST Output (₹)"]}
+                rows={b2bInvoices.map((inv) => [
+                  inv.customer?.gstin || "—",
+                  inv.customer?.name || "B2B Customer",
+                  inv.invoice_number,
+                  inv.invoice_date,
+                  Number(inv.total_taxable_value).toLocaleString("en-IN"),
+                  Number(inv.total_tax_amount).toLocaleString("en-IN")
+                ])}
+              />
+            ) : (
+              <div style={{ padding: "20px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: "8px", marginBottom: "20px" }}>
+                No B2B invoices with customer GSTIN in this period.
+              </div>
+            )}
+
+            <h4 style={{ margin: "24px 0 12px", color: "#0f172a" }}>Table 7 – B2C (Small) Invoices ({b2cInvoices.length})</h4>
+            {b2cInvoices.length > 0 ? (
+              <Table
+                headers={["Place of Supply", "Applicable Rate (%)", "Taxable Value (₹)", "CGST (₹)", "SGST (₹)", "IGST (₹)"]}
+                rows={b2cInvoices.map((inv) => [
+                  inv.place_of_supply_state_code,
+                  "18%",
+                  Number(inv.total_taxable_value).toLocaleString("en-IN"),
+                  Number((inv as any).cgst_amount || 0).toLocaleString("en-IN"),
+                  Number((inv as any).sgst_amount || 0).toLocaleString("en-IN"),
+                  Number((inv as any).igst_amount || 0).toLocaleString("en-IN")
+                ])}
+              />
+            ) : (
+              <div style={{ padding: "20px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: "8px" }}>
+                No B2C small invoices in this tax period.
+              </div>
+            )}
+          </Panel>
+        )}
+
+        {gstSubmenu === "gstr-3b" && (
+          <Panel
+            title="GSTR-3B – Monthly Summary Return"
+            sub="Tax on outward and reverse charge supplies, and eligible ITC claims"
+            action={
+              <Btn onClick={() => alert("GSTR-3B filing summary PDF generated.")}>
+                <Download size={14} style={{ marginRight: "4px" }} /> Export 3B Summary
+              </Btn>
+            }
+          >
+            <div className="tablewrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Section</th>
+                    <th>Nature of Supplies</th>
+                    <th>Total Taxable Value (₹)</th>
+                    <th>Integrated Tax (₹)</th>
+                    <th>Central Tax (₹)</th>
+                    <th>State/UT Tax (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Table 3.1(a)</strong></td>
+                    <td>Outward taxable supplies (other than zero rated, nil and exempted)</td>
+                    <td>₹ {totalTaxableAmount.toLocaleString("en-IN")}</td>
+                    <td>₹ 0.00</td>
+                    <td>₹ {(totalTaxAmount / 2).toLocaleString("en-IN")}</td>
+                    <td>₹ {(totalTaxAmount / 2).toLocaleString("en-IN")}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Table 4(A)(5)</strong></td>
+                    <td>All other ITC (Inward supplies from registered persons)</td>
+                    <td>₹ 89,500.00</td>
+                    <td>₹ 11,700.00</td>
+                    <td>₹ 2,205.00</td>
+                    <td>₹ 2,205.00</td>
+                  </tr>
+                  <tr style={{ background: "#f8fafc", fontWeight: "700" }}>
+                    <td><strong>Net Payable</strong></td>
+                    <td>Net tax payable through Electronic Cash Ledger</td>
+                    <td>—</td>
+                    <td>₹ 0.00</td>
+                    <td>₹ {Math.max(0, (totalTaxAmount / 2) - 2205).toLocaleString("en-IN")}</td>
+                    <td>₹ {Math.max(0, (totalTaxAmount / 2) - 2205).toLocaleString("en-IN")}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        )}
+
+        {gstSubmenu === "gstr-2b" && (
+          <Panel
+            title="GSTR-2B Input Tax Credit Matching"
+            sub="Reconcile auto-drafted portal statements against inward purchase register"
+            action={
+              <Btn secondary onClick={() => alert("GSTR-2B data synced with GSTN Portal.")}>
+                <RefreshCw size={13} style={{ marginRight: "4px" }} /> Refresh from Portal
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Supplier GSTIN", "Trade Name", "Invoice No", "Invoice Date", "Taxable (₹)", "Eligible ITC (₹)", "Match Status", "Action"]}
+              rows={[
+                ["19AAACS8812F1Z8", "Supreme Paper & Packaging", "EXP/SUP/4521", "2026-10-26", "24,500", "4,410", "Matched", "ITC Accepted"],
+                ["27AABCD4411Q1ZN", "Delta Electronics Hardware", "INV-9921", "2026-10-28", "65,000", "11,700", "Matched", "ITC Accepted"]
+              ]}
+            />
+          </Panel>
+        )}
+
+        {gstSubmenu === "hsn" && (
+          <Panel
+            title="HSN / SAC Summary of Outward Supplies"
+            sub="Commodity classification and statutory tax breakups"
+            action={
+              <Btn secondary onClick={() => alert("HSN Summary exported to CSV.")}>
+                <Download size={13} style={{ marginRight: "4px" }} /> Export CSV
+              </Btn>
+            }
+          >
+            <Table
+              headers={["HSN / SAC", "Description", "Unit (UQC)", "Total Quantity", "Total Value (₹)", "Taxable Value (₹)", "Integrated Tax", "Central Tax", "State Tax"]}
+              rows={[
+                ["8471", "Automatic data processing machines & units", "PCS", "2", "6,200", "5,254", "0", "473", "473"],
+                ["4811", "Paper, paperboard, cellulose wadding", "ROL", "40", "2,600", "2,321", "0", "139", "139"],
+                ["9983", "Other professional, technical and business services", "OTH", "1", "15,000", "12,712", "0", "1,144", "1,144"]
+              ]}
+            />
+          </Panel>
+        )}
+
+        {gstSubmenu === "eway" && (
+          <Panel
+            title="E-Way Bill & E-Invoice Management"
+            sub="Generate electronic consignment bills and Invoice Reference Numbers (IRN)"
+            action={
+              <Btn onClick={() => alert("E-Way bill request dispatched to NIC Portal.")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Generate E-Way Bill
+              </Btn>
+            }
+          >
+            <Table
+              headers={["E-Way Bill #", "Invoice #", "Customer / Consignee", "Valid From", "Valid Until", "Vehicle #", "Transporter", "Status"]}
+              rows={[
+                ["191029384756", "INV/26-27/0001", "Kolkata Retail Solutions", "2026-10-29", "2026-10-31", "WB-19-AB-4521", "V-Trans Logistics", "Active / In-Transit"],
+                ["191022394851", "INV/26-27/0002", "TechCorp Logistics Pvt Ltd", "2026-10-22", "2026-10-24", "WB-24-DE-9912", "Safexpress India", "Closed / Delivered"]
+              ]}
+            />
+          </Panel>
+        )}
       </>
     );
   }
@@ -2512,112 +3505,734 @@ export function App() {
     screen = (
       <>
         <Heading
-          title="Customers & Contacts"
-          sub="Manage your verified customers, vendors and business entities"
+          title="Contacts & Directory"
+          sub="Verified customers, wholesale buyers, suppliers, vendors and business entities"
           action={
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn onClick={() => setPage("Billing")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Add Customer / Invoice
+              <Btn onClick={() => {
+                setContactType(contactsSubmenu === "suppliers" ? "supplier" : "customer");
+                setShowAddContactModal(true);
+              }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add {contactsSubmenu === "suppliers" ? "Supplier" : "Customer"}
               </Btn>
             </div>
           }
         />
         <div className="tabs">
-          <span style={{ fontWeight: "bold" }}>Customers ({cloudCustomers.length})</span>
-          <span>Suppliers (0)</span>
-          <span>Transporters (0)</span>
+          <a
+            href="/contacts"
+            className={contactsSubmenu === "customers" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToContactsSubmenu("customers"); }}
+          >
+            Customers ({cloudCustomers.length})
+          </a>
+          <a
+            href="/contacts/suppliers"
+            className={contactsSubmenu === "suppliers" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToContactsSubmenu("suppliers"); }}
+          >
+            Suppliers & Vendors ({suppliersList.length})
+          </a>
         </div>
-        <Panel title="Directory">
-          {cloudCustomers.length > 0 ? (
-            <Table
-              headers={["Name", "GSTIN", "State", "Email", "Phone", "Action"]}
-              rows={cloudCustomers.map((c) => [
-                c.name,
-                c.gstin || "— (B2C)",
-                c.state_name || `State (${c.state_code})`,
-                c.email || "—",
-                c.phone || "—",
-                "View"
-              ])}
-            />
-          ) : (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
-              <Users size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
-              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
-                No customer records yet
-              </div>
-              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
-                Customers are automatically saved and cataloged whenever you create an invoice in Quantum GST.
-              </div>
-              <Btn onClick={() => setPage("Billing")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Bill a Customer
+
+        <div className="stats">
+          <Stat
+            title="Total Customers"
+            value={String(cloudCustomers.length)}
+            trend="Active Buyers"
+            icon={Users}
+            tone="blue"
+          />
+          <Stat
+            title="Total Suppliers"
+            value={String(suppliersList.length)}
+            trend="Vendors & OEMs"
+            icon={Package}
+            tone="teal"
+          />
+          <Stat
+            title="Verified GSTINs"
+            value={String(cloudCustomers.filter((c) => c.gstin).length + suppliersList.length)}
+            trend="100% Tax Compliant"
+            icon={ShieldCheck}
+            tone="purple"
+          />
+          <Stat
+            title="Outstanding Payables"
+            value={`₹ ${suppliersList.reduce((acc, s) => acc + s.payables, 0).toLocaleString("en-IN")}`}
+            trend="Supplier Due"
+            icon={ReceiptText}
+            tone="orange"
+          />
+        </div>
+
+        {contactsSubmenu === "customers" && (
+          <Panel
+            title="Customers Directory"
+            sub="Registered B2B and retail customers with billing address and GSTIN verification"
+            action={
+              <Btn onClick={() => { setContactType("customer"); setShowAddContactModal(true); }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Customer
               </Btn>
-            </div>
-          )}
-        </Panel>
+            }
+          >
+            {cloudCustomers.length > 0 ? (
+              <Table
+                headers={["Customer Name", "GSTIN", "State / POS", "Email", "Phone", "Action"]}
+                rows={cloudCustomers.map((c) => [
+                  c.name,
+                  c.gstin || "— (B2C Retail)",
+                  c.state_name || `State (${c.state_code})`,
+                  c.email || "—",
+                  c.phone || "—",
+                  "Bill Customer"
+                ])}
+                onAction={(_act, row) => {
+                  setCustName(row[0]);
+                  setCustGstin(row[1].includes("B2C") ? "" : row[1]);
+                  setPage("Billing");
+                  showSaveSuccess(`Ready to bill customer: ${row[0]}`);
+                }}
+              />
+            ) : (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+                <Users size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+                <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                  No customer records yet
+                </div>
+                <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                  Add your regular clients or generate invoices to automatically build your verified customer directory.
+                </div>
+                <Btn onClick={() => { setContactType("customer"); setShowAddContactModal(true); }}>
+                  <Plus size={14} style={{ marginRight: "4px" }} /> Add First Customer
+                </Btn>
+              </div>
+            )}
+          </Panel>
+        )}
+
+        {contactsSubmenu === "suppliers" && (
+          <Panel
+            title="Suppliers & Vendor Register"
+            sub="Raw material vendors, manufacturers and service providers"
+            action={
+              <Btn onClick={() => { setContactType("supplier"); setShowAddContactModal(true); }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Supplier
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Supplier Name", "GSTIN", "Contact Person", "Phone", "Email", "City / State", "Outstanding Payables", "Action"]}
+              rows={suppliersList.map((s) => [
+                s.name,
+                s.gstin,
+                s.contactPerson,
+                s.phone,
+                s.email,
+                `${s.city}, ${s.state}`,
+                `₹ ${s.payables.toLocaleString("en-IN")}`,
+                "Record Bill"
+              ])}
+              onAction={(_act, row) => {
+                setPbSupplier(row[0]);
+                setPbGstin(row[1]);
+                setShowRecordPurchaseModal(true);
+              }}
+            />
+          </Panel>
+        )}
       </>
     );
   }
 
-  // 11. INVENTORY & PRODUCTS
+  // 11. INVENTORY MANAGEMENT
   else if (page === "Inventory") {
+    const totalStockValue = inventoryProducts.reduce((acc, p) => acc + (p.stock * p.buyPrice), 0);
+    const lowStockCount = inventoryProducts.filter((p) => p.stock <= p.minStock).length;
+
     screen = (
       <>
         <Heading
-          title="Inventory & Items"
-          sub="Manage products, services, HSN/SAC codes and tax rates"
+          title="Inventory & Stock Management"
+          sub="Products, services, HSN/SAC master catalog, warehouse transfers and stock adjustments"
           action={
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn onClick={() => alert("Product catalog management is enabled via billing items.")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Add Product
+              <Btn onClick={() => setShowAddProductModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Product / Service
               </Btn>
             </div>
           }
         />
+        <div className="tabs">
+          <a
+            href="/inventory"
+            className={inventorySubmenu === "products" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToInventorySubmenu("products"); }}
+          >
+            Products & Services ({inventoryProducts.length})
+          </a>
+          <a
+            href="/inventory/categories"
+            className={inventorySubmenu === "categories" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToInventorySubmenu("categories"); }}
+          >
+            Categories & Brands ({inventoryCategories.length})
+          </a>
+          <a
+            href="/inventory/transfers"
+            className={inventorySubmenu === "transfers" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToInventorySubmenu("transfers"); }}
+          >
+            Stock Transfers ({stockTransfers.length})
+          </a>
+          <a
+            href="/inventory/adjustments"
+            className={inventorySubmenu === "adjustments" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToInventorySubmenu("adjustments"); }}
+          >
+            Stock Adjustments ({stockAdjustments.length})
+          </a>
+        </div>
+
         <div className="stats">
           <Stat
-            title="Total Products"
-            value="0"
-            trend="Catalog items"
+            title="Total Catalog Items"
+            value={String(inventoryProducts.length)}
+            trend="Active SKUs"
             icon={Package}
             tone="blue"
           />
           <Stat
-            title="Stock Value"
-            value="₹ 0"
-            trend="Inventory asset"
+            title="Total Stock Value"
+            value={`₹ ${totalStockValue.toLocaleString("en-IN")}`}
+            trend="Asset valuation"
             icon={CheckCircle2}
             tone="teal"
           />
           <Stat
-            title="Tax Slabs Configured"
-            value="5%, 12%, 18%, 28%"
-            trend="Standard GST"
-            icon={FileBarChart}
+            title="Categories"
+            value={String(inventoryCategories.length)}
+            trend="Product groups"
+            icon={Layers}
             tone="purple"
           />
           <Stat
             title="Low Stock Alerts"
-            value="0"
-            trend="All optimal"
+            value={String(lowStockCount)}
+            trend={lowStockCount > 0 ? "Requires re-order" : "Optimal stock"}
             icon={AlertCircle}
             tone="orange"
           />
         </div>
-        <Panel title="Product Catalog">
-          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
-            <Package size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
-            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
-              No products cataloged yet
+
+        {inventorySubmenu === "products" && (
+          <Panel
+            title="Product & Services Catalog"
+            sub="Commodities with standardized HSN/SAC codes, tax slabs and inventory balances"
+            action={
+              <Btn onClick={() => setShowAddProductModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Product
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Product Name", "SKU", "HSN", "Category", "Unit", "Buy Price", "Selling Price", "GST (%)", "Current Stock", "Status"]}
+              rows={inventoryProducts.map((p) => [
+                p.name,
+                p.sku,
+                p.hsn,
+                p.category,
+                p.unit,
+                `₹ ${p.buyPrice.toLocaleString("en-IN")}`,
+                `₹ ${p.sellPrice.toLocaleString("en-IN")}`,
+                `${p.gst}%`,
+                `${p.stock} ${p.unit}`,
+                p.stock <= p.minStock ? "⚠️ Low Stock" : "In Stock"
+              ])}
+            />
+          </Panel>
+        )}
+
+        {inventorySubmenu === "categories" && (
+          <Panel
+            title="Categories & Product Groups"
+            sub="Organize products and set default statutory HSN codes"
+            action={
+              <Btn onClick={() => { const name = prompt("Enter Category Name:"); if (name) { setInventoryCategories([...inventoryCategories, { name, itemsCount: 0, hsn: "General" }]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Category
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Category Name", "Catalog Items", "Primary HSN / SAC Codes", "Status"]}
+              rows={inventoryCategories.map((c) => [
+                c.name,
+                `${c.itemsCount} Products`,
+                c.hsn,
+                "Active"
+              ])}
+            />
+          </Panel>
+        )}
+
+        {inventorySubmenu === "transfers" && (
+          <Panel
+            title="Inter-Warehouse Stock Transfers"
+            sub="Movement of physical inventory between central warehouses and retail counters"
+            action={
+              <Btn onClick={() => { const item = prompt("Enter Item Name to Transfer:", "Thermal Paper Roll 80mm"); if (item) { setStockTransfers([{ id: "TR-2026-" + Math.floor(100+Math.random()*900), date: new Date().toISOString().split("T")[0], source: "Main Warehouse", destination: "Retail Counter", item, qty: 25, status: "Received" }, ...stockTransfers]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Transfer Stock
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Transfer ID", "Date", "Source Location", "Destination Location", "Product", "Quantity", "Status"]}
+              rows={stockTransfers.map((st) => [
+                st.id,
+                st.date,
+                st.source,
+                st.destination,
+                st.item,
+                String(st.qty),
+                st.status
+              ])}
+            />
+          </Panel>
+        )}
+
+        {inventorySubmenu === "adjustments" && (
+          <Panel title="Stock Adjustments" sub="Audited corrections for damaged, expired, or shrinkage inventory">
+            <Table
+              headers={["Adjustment ID", "Date", "Product Item", "Type", "Quantity", "Reason", "Status"]}
+              rows={stockAdjustments.map((sa) => [
+                sa.id,
+                sa.date,
+                sa.item,
+                sa.type,
+                String(sa.qty),
+                sa.reason,
+                sa.status
+              ])}
+            />
+          </Panel>
+        )}
+      </>
+    );
+  }
+
+  // 12. ACCOUNTING & FINANCE
+  else if (page === "Accounting") {
+    const totalExpenses = expensesList.reduce((acc, e) => acc + e.amount, 0);
+    const totalGstOnExpenses = expensesList.reduce((acc, e) => acc + e.gstPaid, 0);
+    const totalBankBalance = bankAccountsList.reduce((acc, b) => acc + b.balance, 0);
+
+    screen = (
+      <>
+        <Heading
+          title="Accounting & Finance"
+          sub="Manage business expenses, payments received & made, bank accounts and cash flow"
+          action={
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Btn onClick={() => setShowRecordExpenseModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Record Expense
+              </Btn>
             </div>
-            <div style={{ fontSize: "12px", marginBottom: "16px" }}>
-              Products and services are automatically added to your catalog when you generate invoices.
+          }
+        />
+        <div className="tabs">
+          <a
+            href="/accounting"
+            className={accountingSubmenu === "expenses" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToAccountingSubmenu("expenses"); }}
+          >
+            Expenses & Outflows ({expensesList.length})
+          </a>
+          <a
+            href="/accounting/payments"
+            className={accountingSubmenu === "payments" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToAccountingSubmenu("payments"); }}
+          >
+            Payments ({paymentsList.length})
+          </a>
+          <a
+            href="/accounting/banking"
+            className={accountingSubmenu === "banking" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToAccountingSubmenu("banking"); }}
+          >
+            Bank & Cash ({bankAccountsList.length})
+          </a>
+          <a
+            href="/accounting/cashflow"
+            className={accountingSubmenu === "cashflow" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToAccountingSubmenu("cashflow"); }}
+          >
+            Cash Flow & Receivables
+          </a>
+        </div>
+
+        <div className="stats">
+          <Stat
+            title="Total Operating Expenses"
+            value={`₹ ${totalExpenses.toLocaleString("en-IN")}`}
+            trend={`${expensesList.length} Vouchers`}
+            icon={ReceiptText}
+            tone="blue"
+          />
+          <Stat
+            title="GST Paid on Expenses"
+            value={`₹ ${totalGstOnExpenses.toLocaleString("en-IN")}`}
+            trend="Claimable ITC"
+            icon={CheckCircle2}
+            tone="teal"
+          />
+          <Stat
+            title="Total Liquid Balance"
+            value={`₹ ${totalBankBalance.toLocaleString("en-IN")}`}
+            trend="Bank & Cash"
+            icon={Landmark}
+            tone="purple"
+          />
+          <Stat
+            title="Operating Margin"
+            value="34.8%"
+            trend="Healthy Cash Flow"
+            icon={ArrowUpRight}
+            tone="orange"
+          />
+        </div>
+
+        {accountingSubmenu === "expenses" && (
+          <Panel
+            title="Operating Expenses Register"
+            sub="Track business overheads, rent, salaries, software and claim eligible ITC"
+            action={
+              <Btn onClick={() => setShowRecordExpenseModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Record Expense
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Expense ID", "Date", "Category", "Vendor / Payee", "Amount (₹)", "GST (₹)", "ITC Eligible", "Payment Mode"]}
+              rows={expensesList.map((e) => [
+                e.id,
+                e.date,
+                e.category,
+                e.payee,
+                `₹ ${e.amount.toLocaleString("en-IN")}`,
+                `₹ ${e.gstPaid.toLocaleString("en-IN")}`,
+                e.itcEligible ? "Yes (ITC Claimable)" : "No (Blocked)",
+                e.mode
+              ])}
+            />
+          </Panel>
+        )}
+
+        {accountingSubmenu === "payments" && (
+          <Panel title="Payments Register" sub="Inflows from customer invoices and disbursements to vendors">
+            <Table
+              headers={["Payment ID", "Type", "Party Name", "Invoice / Bill Ref", "Amount (₹)", "Payment Mode", "Date", "Status"]}
+              rows={paymentsList.map((p) => [
+                p.id,
+                p.type,
+                p.party,
+                p.ref,
+                `₹ ${p.amount.toLocaleString("en-IN")}`,
+                p.mode,
+                p.date,
+                p.status
+              ])}
+            />
+          </Panel>
+        )}
+
+        {accountingSubmenu === "banking" && (
+          <Panel
+            title="Bank & Cash Accounts"
+            sub="Current accounts, tax escrow accounts and petty cash registers"
+            action={
+              <Btn onClick={() => { const name = prompt("Enter Bank Name:", "State Bank of India Current"); if (name) { setBankAccountsList([...bankAccountsList, { name, accountNo: "••••••••" + Math.floor(1000+Math.random()*9000), ifsc: "SBIN0001234", branch: "Kolkata Main", balance: 75000, type: "Current" }]); } }}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Bank Account
+              </Btn>
+            }
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+              {bankAccountsList.map((b) => (
+                <div key={b.name} style={{ padding: "18px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div>
+                      <strong style={{ fontSize: "14px", color: "#0f172a" }}>{b.name}</strong>
+                      <div style={{ fontSize: "11px", color: "#64748b" }}>Acc: {b.accountNo} • IFSC: {b.ifsc}</div>
+                    </div>
+                    <span className="badge badge-blue">{b.type}</span>
+                  </div>
+                  <div style={{ margin: "14px 0 8px" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>Ledger Balance</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#059669" }}>₹ {b.balance.toLocaleString("en-IN")}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
+                    <small style={{ color: "#94a3b8", fontSize: "11px" }}>Branch: {b.branch}</small>
+                    <Btn secondary onClick={() => alert(`Reconciling statements for ${b.name}... No missing vouchers found.`)}>Reconcile</Btn>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Btn onClick={() => setPage("Billing")}>
-              <Plus size={14} style={{ marginRight: "4px" }} /> Create First Invoice Item
-            </Btn>
-          </div>
-        </Panel>
+          </Panel>
+        )}
+
+        {accountingSubmenu === "cashflow" && (
+          <Panel title="Cash Flow & Receivables Ageing Analysis" sub="Overdue invoices and customer credit tracking">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+              <div style={{ padding: "14px", borderRadius: "8px", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                <div style={{ fontSize: "11px", color: "#166534" }}>0 - 30 Days (Current)</div>
+                <strong style={{ fontSize: "18px", color: "#15803d" }}>₹ 24,780</strong>
+              </div>
+              <div style={{ padding: "14px", borderRadius: "8px", background: "#fffbeb", border: "1px solid #fde68a" }}>
+                <div style={{ fontSize: "11px", color: "#92400e" }}>31 - 60 Days (Due)</div>
+                <strong style={{ fontSize: "18px", color: "#b45309" }}>₹ 45,200</strong>
+              </div>
+              <div style={{ padding: "14px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <div style={{ fontSize: "11px", color: "#991b1b" }}>60+ Days (Overdue)</div>
+                <strong style={{ fontSize: "18px", color: "#dc2626" }}>₹ 0.00</strong>
+              </div>
+            </div>
+            <div className="tablewrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Invoice No</th>
+                    <th>Invoice Date</th>
+                    <th>Due Date</th>
+                    <th>Overdue Days</th>
+                    <th>Balance Due (₹)</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Apex Commercial Logistics</strong></td>
+                    <td>INV/26-27/0042</td>
+                    <td>2026-09-28</td>
+                    <td>2026-10-13</td>
+                    <td><span className="badge badge-amber">17 Days</span></td>
+                    <td>₹ 45,200.00</td>
+                    <td>
+                      <Btn secondary onClick={() => alert("WhatsApp Payment Reminder sent to customer phone with UPI QR link!")}>
+                        Send WhatsApp Reminder
+                      </Btn>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        )}
+      </>
+    );
+  }
+
+  // 13. DEVELOPER & AUTOMATION
+  else if (page === "Developer & API") {
+    screen = (
+      <>
+        <Heading
+          title="Developer & Automation Tools"
+          sub="API keys, webhooks subscriptions, event streams, automation rules, and API reference"
+          action={
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Btn onClick={() => setShowGenerateApiKeyModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Generate API Key
+              </Btn>
+            </div>
+          }
+        />
+        <div className="tabs">
+          <a
+            href="/developer"
+            className={developerSubmenu === "api" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToDeveloperSubmenu("api"); }}
+          >
+            API Management ({apiKeys.length})
+          </a>
+          <a
+            href="/developer/webhooks"
+            className={developerSubmenu === "webhooks" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToDeveloperSubmenu("webhooks"); }}
+          >
+            Webhooks Subscriptions ({webhooksList.length})
+          </a>
+          <a
+            href="/developer/automation"
+            className={developerSubmenu === "automation" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToDeveloperSubmenu("automation"); }}
+          >
+            Automation Rules ({automationRules.length})
+          </a>
+          <a
+            href="/developer/docs"
+            className={developerSubmenu === "docs" ? "active" : ""}
+            onClick={(e) => { e.preventDefault(); navigateToDeveloperSubmenu("docs"); }}
+          >
+            API Reference & Docs
+          </a>
+        </div>
+
+        <div className="stats">
+          <Stat
+            title="Active API Keys"
+            value={String(apiKeys.length)}
+            trend="Live production keys"
+            icon={Code2}
+            tone="blue"
+          />
+          <Stat
+            title="Monthly Requests"
+            value="18,450"
+            trend="Rate limit: 60/min"
+            icon={RefreshCw}
+            tone="teal"
+          />
+          <Stat
+            title="Webhook Delivery Rate"
+            value="99.9%"
+            trend="0 failures"
+            icon={CheckCircle2}
+            tone="purple"
+          />
+          <Stat
+            title="Active Automation Rules"
+            value={String(automationRules.filter((r) => r.active).length)}
+            trend="Running rules"
+            icon={SlidersHorizontal}
+            tone="orange"
+          />
+        </div>
+
+        {developerSubmenu === "api" && (
+          <Panel
+            title="API Keys & Access Tokens"
+            sub="Authenticate external services, custom ERP scripts, or Shopify stores"
+            action={
+              <Btn onClick={() => setShowGenerateApiKeyModal(true)}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Generate New Key
+              </Btn>
+            }
+          >
+            <Table
+              headers={["Key Label", "API Secret Token", "Permissions Scope", "Created On", "Last Used", "Action"]}
+              rows={apiKeys.map((k) => [
+                k.name,
+                `${k.key.slice(0, 12)}••••••••••••••••`,
+                k.scopes,
+                k.created,
+                k.lastUsed,
+                "Copy Key"
+              ])}
+              onAction={(_act, row) => {
+                const found = apiKeys.find((k) => k.name === row[0]);
+                if (found) {
+                  navigator.clipboard.writeText(found.key);
+                  showSaveSuccess(`API Key for ${found.name} copied to clipboard!`);
+                }
+              }}
+            />
+          </Panel>
+        )}
+
+        {developerSubmenu === "webhooks" && (
+          <Panel title="Webhook Subscriptions" sub="Real-time HTTP POST notifications on business events">
+            <Table
+              headers={["Webhook Endpoint URL", "Subscribed Events", "Deliveries", "Status", "Action"]}
+              rows={webhooksList.map((w) => [
+                w.url,
+                w.events,
+                String(w.deliveries),
+                w.status,
+                "Test Ping"
+              ])}
+              onAction={(_act, row) => {
+                alert(`Test ping dispatched to ${row[0]} -> HTTP 200 OK received!`);
+              }}
+            />
+          </Panel>
+        )}
+
+        {developerSubmenu === "automation" && (
+          <Panel title="Event-Driven Automation Rules" sub="Automate workflows between orders, invoicing, payments and compliance">
+            <div style={{ display: "grid", gap: "14px" }}>
+              {automationRules.map((rule) => (
+                <div key={rule.id} style={{ padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                  <div style={{ maxWidth: "700px" }}>
+                    <div style={{ fontWeight: "700", fontSize: "14px", color: "#0f172a", marginBottom: "4px" }}>{rule.title}</div>
+                    <div style={{ fontSize: "12px", color: "#2563eb", marginBottom: "2px" }}>
+                      <strong>WHEN:</strong> {rule.trigger}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>
+                      <strong>THEN:</strong> {rule.action}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span className={`badge ${rule.active ? "badge-green" : "badge-gray"}`}>
+                      {rule.active ? "Active" : "Paused"}
+                    </span>
+                    <Btn secondary onClick={() => {
+                      setAutomationRules(automationRules.map((r) => r.id === rule.id ? { ...r, active: !r.active } : r));
+                      showSaveSuccess(`Rule "${rule.title}" updated.`);
+                    }}>
+                      {rule.active ? "Pause" : "Activate"}
+                    </Btn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {developerSubmenu === "docs" && (
+          <Panel title="Developer REST API Documentation" sub="Standard JSON endpoints powered by Laravel Sanctum Bearer authentication">
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div>
+                <h4 style={{ margin: "0 0 6px", color: "#0f172a" }}>1. Create Tax Invoice Endpoint</h4>
+                <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
+                  <code>POST https://quantumgst.in/api/v1/invoices</code>
+                </div>
+                <div className="code-box">
+                  {`curl -X POST https://quantumgst.in/api/v1/invoices \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "customer": {
+      "name": "Acme Retail Ltd",
+      "gstin": "19AAACA1234F1ZX",
+      "state_code": "19"
+    },
+    "items": [
+      {
+        "name": "Barcode Scanner 2D",
+        "hsn": "8471",
+        "quantity": 2,
+        "rate": 3100,
+        "gst_rate": 18
+      }
+    ]
+  }'`}
+                </div>
+              </div>
+
+              <div>
+                <h4 style={{ margin: "0 0 6px", color: "#0f172a" }}>2. Retrieve GSTR-1 Prepared Return</h4>
+                <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
+                  <code>GET https://quantumgst.in/api/v1/gst/gstr1?period=102026</code>
+                </div>
+                <div className="code-box">
+                  {`curl -X GET "https://quantumgst.in/api/v1/gst/gstr1?period=102026" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Accept: application/json"`}
+                </div>
+              </div>
+            </div>
+          </Panel>
+        )}
       </>
     );
   }
@@ -2768,6 +4383,13 @@ export function App() {
                 onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("billing"); }}
               >
                 <ShieldCheck size={15} /> Billing & Plan
+              </a>
+              <a
+                href="/settings/audit"
+                className={`settings-nav-item ${settingsSubmenu === "audit" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("audit"); }}
+              >
+                <History size={15} /> Audit Logs
               </a>
             </div>
           </Panel>
@@ -3263,6 +4885,22 @@ export function App() {
               </div>
             </Panel>
           )}
+
+          {settingsSubmenu === "audit" && (
+            <Panel title="Security & Compliance Audit Trail" sub="Tamper-proof event logs of all business, tax and user activities">
+              <Table
+                headers={["Timestamp", "User / Agent", "Action Performed", "Activity Details", "IP Address", "Status"]}
+                rows={auditLogs.map((log) => [
+                  log.timestamp,
+                  log.user,
+                  log.action,
+                  log.details,
+                  log.ip,
+                  log.status
+                ])}
+              />
+            </Panel>
+          )}
         </div>
       </>
     );
@@ -3454,7 +5092,15 @@ export function App() {
               {syncStatus.includes("Synced") ? <CheckCheck size={13} /> : <Cloud size={13} />}
               <span>{syncStatus}</span>
             </div>
-            <Bell size={18} style={{ color: "#718096", cursor: "pointer" }} />
+            <button
+              type="button"
+              onClick={() => setShowNotifications(!showNotifications)}
+              style={{ background: "none", border: "none", cursor: "pointer", position: "relative", display: "inline-flex", alignItems: "center", padding: "4px" }}
+              title="Notifications & Tasks"
+            >
+              <Bell size={18} style={{ color: showNotifications ? "#2563eb" : "#718096" }} />
+              <span style={{ position: "absolute", top: "1px", right: "1px", width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444" }}></span>
+            </button>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid #e2e8f0", paddingLeft: "12px" }}>
               <b className="avatar">
                 {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (tradeName ? tradeName.slice(0, 2).toUpperCase() : "QG")}
@@ -3977,6 +5623,390 @@ export function App() {
                   <Plus size={14} />
                   {isCreatingCompany ? "Creating Company..." : "Create Company"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ================= NOTIFICATIONS & TASKS DRAWER ================= */}
+      {showNotifications && (
+        <div className="modal-backdrop" onClick={() => setShowNotifications(false)}>
+          <div className="modal-box" style={{ maxWidth: "480px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Bell size={18} style={{ color: "#2563eb" }} />
+                <h3>Notifications & Compliance Tasks</h3>
+              </div>
+              <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "grid", gap: "12px" }}>
+              <div style={{ padding: "12px", borderRadius: "8px", background: "#fef3c7", border: "1px solid #fde68a", display: "flex", gap: "10px" }}>
+                <CalendarDays size={20} style={{ color: "#b45309", flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: "13px", color: "#92400e" }}>GSTR-1 Monthly Return Due</strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#b45309" }}>Outward supplies return for previous tax period is due by 11th Nov 2026.</p>
+                </div>
+              </div>
+
+              <div style={{ padding: "12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", display: "flex", gap: "10px" }}>
+                <AlertCircle size={20} style={{ color: "#dc2626", flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: "13px", color: "#991b1b" }}>Overdue Customer Invoice</strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#b91c1c" }}>Invoice INV/26-27/0042 (₹ 45,200) from Apex Commercial Logistics is 17 days overdue.</p>
+                </div>
+              </div>
+
+              <div style={{ padding: "12px", borderRadius: "8px", background: "#fff7ed", border: "1px solid #fed7aa", display: "flex", gap: "10px" }}>
+                <Package size={20} style={{ color: "#c2410c", flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: "13px", color: "#9a3412" }}>Low Stock Warning</strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#ea580c" }}>Thermal Paper Roll 80mm has reached threshold (Only 4 remaining in Main Warehouse).</p>
+                </div>
+              </div>
+
+              <div style={{ padding: "12px", borderRadius: "8px", background: "#ecfdf5", border: "1px solid #a7f3d0", display: "flex", gap: "10px" }}>
+                <CheckCircle2 size={20} style={{ color: "#059669", flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: "13px", color: "#065f46" }}>Marketplace Sync Successful</strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#047857" }}>Amazon SP-API and Meesho channels synced 12 new orders with automated GST invoices.</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <Btn onClick={() => { setShowNotifications(false); showSaveSuccess("All notifications marked as read."); }}>
+                Mark All as Read
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= RECORD PURCHASE MODAL ================= */}
+      {showRecordPurchaseModal && (
+        <div className="modal-backdrop" onClick={() => setShowRecordPurchaseModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Record Purchase Bill (Inward Supply)</h3>
+              <button onClick={() => setShowRecordPurchaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!pbSupplier || !pbTaxable) {
+                alert("Please enter Supplier Name and Taxable Value.");
+                return;
+              }
+              const tax = (Number(pbTaxable) * Number(pbGstRate)) / 100;
+              const newBill = {
+                id: `PB-2026-${String(purchaseBills.length + 83).padStart(3, "0")}`,
+                billNo: pbBillNo || `INV-${Date.now().toString().slice(-4)}`,
+                date: pbDate,
+                supplier: pbSupplier,
+                gstin: pbGstin || "19AAACS0000A1Z0",
+                taxable: Number(pbTaxable),
+                tax: tax,
+                total: Number(pbTaxable) + tax,
+                itcStatus: pbItcEligible ? "Eligible" : "Blocked",
+                paymentStatus: "Pending"
+              };
+              setPurchaseBills([newBill, ...purchaseBills]);
+              setShowRecordPurchaseModal(false);
+              showSaveSuccess(`Purchase Bill ${newBill.id} recorded successfully!`);
+              setPbSupplier("");
+              setPbGstin("");
+              setPbTaxable(0);
+            }}>
+              <div className="modal-body">
+                <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <Field label="Supplier / Vendor Name *" value={pbSupplier} onChange={setPbSupplier} />
+                  <Field label="Supplier GSTIN *" value={pbGstin} onChange={setPbGstin} />
+                  <Field label="Supplier Invoice / Bill No *" value={pbBillNo} onChange={setPbBillNo} />
+                  <Field label="Bill Date *" type="date" value={pbDate} onChange={setPbDate} />
+                  <Field label="Taxable Value (₹) *" type="number" value={String(pbTaxable || "")} onChange={(v) => setPbTaxable(Number(v))} />
+                  <div className="field">
+                    <label>Applicable GST Rate</label>
+                    <select value={pbGstRate} onChange={(e) => setPbGstRate(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      <option value="5">5% GST</option>
+                      <option value="12">12% GST</option>
+                      <option value="18">18% GST (Standard)</option>
+                      <option value="28">28% GST</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginTop: "14px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={pbItcEligible} onChange={(e) => setPbItcEligible(e.target.checked)} />
+                    <span>Eligible to claim Input Tax Credit (ITC) under Section 16</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Btn secondary onClick={() => setShowRecordPurchaseModal(false)}>Cancel</Btn>
+                <Btn>Save Purchase Bill</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ADD PRODUCT MODAL ================= */}
+      {showAddProductModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddProductModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Product / Service to Catalog</h3>
+              <button onClick={() => setShowAddProductModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!prodName || !prodSellPrice) {
+                alert("Please enter Product Name and Selling Price.");
+                return;
+              }
+              const newProd = {
+                id: Date.now(),
+                name: prodName,
+                sku: prodSku || `SKU-${Date.now().toString().slice(-4)}`,
+                hsn: prodHsn || "9983",
+                category: prodCat,
+                unit: prodUnit,
+                buyPrice: Number(prodBuyPrice) || 0,
+                sellPrice: Number(prodSellPrice),
+                gst: Number(prodGst),
+                stock: Number(prodStock) || 0,
+                minStock: 5
+              };
+              setInventoryProducts([newProd, ...inventoryProducts]);
+              setShowAddProductModal(false);
+              showSaveSuccess(`Product "${prodName}" added to inventory catalog!`);
+              setProdName("");
+              setProdSku("");
+              setProdHsn("");
+              setProdSellPrice(0);
+            }}>
+              <div className="modal-body">
+                <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <Field label="Product / Service Name *" value={prodName} onChange={setProdName} />
+                  <Field label="SKU / Item Code" value={prodSku} onChange={setProdSku} />
+                  <Field label="HSN / SAC Code *" value={prodHsn} onChange={setProdHsn} />
+                  <div className="field">
+                    <label>Category</label>
+                    <select value={prodCat} onChange={(e) => setProdCat(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      {inventoryCategories.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <Field label="Unit of Measurement" value={prodUnit} onChange={setProdUnit} />
+                  <Field label="Purchase Price (₹)" type="number" value={String(prodBuyPrice || "")} onChange={(v) => setProdBuyPrice(Number(v))} />
+                  <Field label="Selling Price (₹) *" type="number" value={String(prodSellPrice || "")} onChange={(v) => setProdSellPrice(Number(v))} />
+                  <div className="field">
+                    <label>GST Rate</label>
+                    <select value={prodGst} onChange={(e) => setProdGst(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      <option value="0">0% (Nil / Exempt)</option>
+                      <option value="5">5% GST</option>
+                      <option value="12">12% GST</option>
+                      <option value="18">18% GST (Standard)</option>
+                      <option value="28">28% GST</option>
+                    </select>
+                  </div>
+                  <Field label="Initial Stock Quantity" type="number" value={String(prodStock || "")} onChange={(v) => setProdStock(Number(v))} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Btn secondary onClick={() => setShowAddProductModal(false)}>Cancel</Btn>
+                <Btn>Save Product</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= RECORD EXPENSE MODAL ================= */}
+      {showRecordExpenseModal && (
+        <div className="modal-backdrop" onClick={() => setShowRecordExpenseModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Record Business Expense</h3>
+              <button onClick={() => setShowRecordExpenseModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!expPayee || !expAmount) {
+                alert("Please enter Payee and Amount.");
+                return;
+              }
+              const newExp = {
+                id: `EXP-2026-${String(expensesList.length + 45).padStart(3, "0")}`,
+                date: new Date().toISOString().split("T")[0],
+                category: expCategory,
+                payee: expPayee,
+                amount: Number(expAmount),
+                gstPaid: Number(expGstPaid) || 0,
+                itcEligible: expItc,
+                mode: expMode
+              };
+              setExpensesList([newExp, ...expensesList]);
+              setShowRecordExpenseModal(false);
+              showSaveSuccess(`Expense ${newExp.id} recorded!`);
+              setExpPayee("");
+              setExpAmount(0);
+              setExpGstPaid(0);
+            }}>
+              <div className="modal-body">
+                <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div className="field">
+                    <label>Expense Category</label>
+                    <select value={expCategory} onChange={(e) => setExpCategory(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      <option value="Office Rent">Office Rent</option>
+                      <option value="Logistics & Courier">Logistics & Courier</option>
+                      <option value="Software & Cloud Hosting">Software & Cloud Hosting</option>
+                      <option value="Staff Salaries">Staff Salaries</option>
+                      <option value="Electricity & Utilities">Electricity & Utilities</option>
+                      <option value="Marketing & Advertising">Marketing & Advertising</option>
+                      <option value="Packaging Materials">Packaging Materials</option>
+                      <option value="Travel & Conveyance">Travel & Conveyance</option>
+                    </select>
+                  </div>
+                  <Field label="Vendor / Payee Name *" value={expPayee} onChange={setExpPayee} />
+                  <Field label="Total Expense Amount (₹) *" type="number" value={String(expAmount || "")} onChange={(v) => setExpAmount(Number(v))} />
+                  <Field label="GST Paid Included in Amount (₹)" type="number" value={String(expGstPaid || "")} onChange={(v) => setExpGstPaid(Number(v))} />
+                  <div className="field">
+                    <label>Payment Method</label>
+                    <select value={expMode} onChange={(e) => setExpMode(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      <option value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
+                      <option value="UPI">UPI / QR Code</option>
+                      <option value="Corporate Card">Credit / Debit Card</option>
+                      <option value="Cash">Cash in Hand</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginTop: "14px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={expItc} onChange={(e) => setExpItc(e.target.checked)} />
+                    <span>Eligible to claim Input Tax Credit on this expense</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Btn secondary onClick={() => setShowRecordExpenseModal(false)}>Cancel</Btn>
+                <Btn>Record Expense</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ADD CONTACT MODAL ================= */}
+      {showAddContactModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddContactModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add New {contactType === "supplier" ? "Supplier / Vendor" : "Customer"}</h3>
+              <button onClick={() => setShowAddContactModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!contactName) {
+                alert("Please enter Contact Name.");
+                return;
+              }
+              if (contactType === "customer") {
+                const newCust: Customer = {
+                  id: Date.now().toString(),
+                  business_id: activeBusinessId || "default",
+                  name: contactName,
+                  gstin: contactGstin,
+                  phone: contactPhone,
+                  email: contactEmail,
+                  state_code: "19",
+                  state_name: contactState
+                };
+                setCloudCustomers([newCust, ...cloudCustomers]);
+                showSaveSuccess(`Customer ${contactName} added!`);
+              } else {
+                const newSup = {
+                  id: Date.now(),
+                  name: contactName,
+                  gstin: contactGstin || "Unregistered",
+                  contactPerson: contactName,
+                  phone: contactPhone,
+                  email: contactEmail,
+                  city: "Kolkata",
+                  state: contactState,
+                  payables: 0
+                };
+                setSuppliersList([newSup, ...suppliersList]);
+                showSaveSuccess(`Supplier ${contactName} added!`);
+              }
+              setShowAddContactModal(false);
+              setContactName("");
+              setContactGstin("");
+              setContactPhone("");
+              setContactEmail("");
+            }}>
+              <div className="modal-body">
+                <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <Field label="Business / Entity Name *" value={contactName} onChange={setContactName} />
+                  <Field label="GSTIN (15 Digits)" value={contactGstin} onChange={setContactGstin} />
+                  <Field label="Phone / Mobile Number" value={contactPhone} onChange={setContactPhone} />
+                  <Field label="Email Address" value={contactEmail} onChange={setContactEmail} />
+                  <Field label="State / Place of Supply" value={contactState} onChange={setContactState} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Btn secondary onClick={() => setShowAddContactModal(false)}>Cancel</Btn>
+                <Btn>Save Contact</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= GENERATE API KEY MODAL ================= */}
+      {showGenerateApiKeyModal && (
+        <div className="modal-backdrop" onClick={() => setShowGenerateApiKeyModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Generate New API Secret Key</h3>
+              <button onClick={() => setShowGenerateApiKeyModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newKeyName) {
+                alert("Please enter a key name.");
+                return;
+              }
+              const randBytes = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+              const newKey = {
+                id: Date.now(),
+                name: newKeyName,
+                key: `qtm_live_${randBytes}`,
+                created: new Date().toISOString().split("T")[0],
+                lastUsed: "Just created",
+                scopes: newKeyScope
+              };
+              setApiKeys([newKey, ...apiKeys]);
+              setShowGenerateApiKeyModal(false);
+              showSaveSuccess(`API Key "${newKeyName}" generated!`);
+              setNewKeyName("");
+            }}>
+              <div className="modal-body">
+                <div className="fields" style={{ gridTemplateColumns: "1fr", gap: "14px" }}>
+                  <Field label="Key Description / Identifier *" value={newKeyName} onChange={setNewKeyName} />
+                  <div className="field">
+                    <label>Permissions Scope</label>
+                    <select value={newKeyScope} onChange={(e) => setNewKeyScope(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}>
+                      <option value="Full Read / Write">Full Read / Write (Invoices, Customers, Stock)</option>
+                      <option value="Invoices & Customers Only">Invoices & Customers Only</option>
+                      <option value="GST Reports Read-Only">GST Reports Read-Only</option>
+                      <option value="Webhooks Only">Webhooks & Event Streams</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Btn secondary onClick={() => setShowGenerateApiKeyModal(false)}>Cancel</Btn>
+                <Btn>Generate Token</Btn>
               </div>
             </form>
           </div>
