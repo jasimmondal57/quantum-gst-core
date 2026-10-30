@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 import { AuthScreen } from "./components/AuthScreen";
 import { api } from "./services/api";
-import type { Invoice, Customer } from "./services/api";
+import type { Invoice, Customer, BusinessProfile } from "./services/api";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -298,6 +298,19 @@ export function App() {
   const [marketplaceOrders, setMarketplaceOrders] = useState<any[]>([]);
   const [_gstr1Data, setGstr1Data] = useState<any>(null);
 
+  // Multi-Company State
+  const [userBusinesses, setUserBusinesses] = useState<BusinessProfile[]>([]);
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  const [showNewCompanyModal, setShowNewCompanyModal] = useState(false);
+  const [newLegalName, setNewLegalName] = useState("");
+  const [newTradeName, setNewTradeName] = useState("");
+  const [newGstin, setNewGstin] = useState("");
+  const [newPan, setNewPan] = useState("");
+  const [newStateName, setNewStateName] = useState("West Bengal");
+  const [newStateCode, setNewStateCode] = useState("19");
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [createCompanyError, setCreateCompanyError] = useState("");
+
   const [page, setPage] = useState<Page>("Dashboard");
   const [mobile, setMobile] = useState(false);
 
@@ -454,23 +467,41 @@ export function App() {
         setIsAuthenticated(true);
 
         const org = me.organization || (me.organizations && me.organizations[0]);
-        const biz = me.business || (org && org.businesses && org.businesses[0]);
-
         if (org) {
           setActiveOrgId(org.id);
         }
 
-        if (biz) {
-          const currentBizId = overrideBizId || biz.id;
-          setActiveBusinessId(currentBizId);
-          setLegalName(biz.legal_name || me.user.name || "My Business");
-          setTradeName(biz.trade_name || biz.legal_name || me.user.name || "My Business");
-          setPanNumber(biz.pan || "");
-          setBizEmail(biz.email || me.user.email || "");
-          setBizPhone(biz.phone || "");
+        // Fetch user's registered businesses
+        let allBusinesses: BusinessProfile[] = [];
+        try {
+          const bizRes = await api.fetchBusinesses();
+          if (bizRes && Array.isArray(bizRes.data) && bizRes.data.length > 0) {
+            allBusinesses = bizRes.data;
+          }
+        } catch {
+          // fallback
+        }
+        if (allBusinesses.length === 0) {
+          if (me.business) allBusinesses.push(me.business);
+          else if (org && org.businesses) allBusinesses = org.businesses;
+        }
+        setUserBusinesses(allBusinesses);
 
-          if (biz.gstins && biz.gstins.length > 0) {
-            const g = biz.gstins[0];
+        const targetBiz = overrideBizId
+          ? allBusinesses.find((b) => b.id === overrideBizId) || allBusinesses[0]
+          : allBusinesses.find((b) => b.id === activeBusinessId) || allBusinesses[0] || me.business;
+
+        if (targetBiz) {
+          const currentBizId = targetBiz.id;
+          setActiveBusinessId(currentBizId);
+          setLegalName(targetBiz.legal_name || me.user.name || "My Business");
+          setTradeName(targetBiz.trade_name || targetBiz.legal_name || me.user.name || "My Business");
+          setPanNumber(targetBiz.pan || "");
+          setBizEmail(targetBiz.email || me.user.email || "");
+          setBizPhone(targetBiz.phone || "");
+
+          if (targetBiz.gstins && targetBiz.gstins.length > 0) {
+            const g = targetBiz.gstins[0];
             setPrimaryGstin(g.gstin);
             setStateCode(g.state_code);
             setStateName(g.state_name);
@@ -478,6 +509,9 @@ export function App() {
             if (g.address_line1) setAddressLine(g.address_line1);
             if (g.city) setCity(g.city);
             if (g.pincode) setPincode(g.pincode);
+          } else {
+            setPrimaryGstin("");
+            setActiveGstinId("");
           }
 
           localStorage.setItem("quantum_onboarding_completed", "true");
@@ -488,9 +522,11 @@ export function App() {
             const invRes = await api.fetchInvoices(currentBizId);
             if (invRes && invRes.data) {
               setCloudInvoices(invRes.data);
+            } else {
+              setCloudInvoices([]);
             }
           } catch {
-            // Keep existing
+            setCloudInvoices([]);
           }
 
           // Fetch real Customers from Cloud
@@ -498,9 +534,11 @@ export function App() {
             const custRes = await api.fetchCustomers(currentBizId);
             if (custRes) {
               setCloudCustomers(Array.isArray(custRes) ? custRes : (custRes as any).data || []);
+            } else {
+              setCloudCustomers([]);
             }
           } catch {
-            // Keep existing
+            setCloudCustomers([]);
           }
 
           // Fetch real Marketplace Orders from Cloud
@@ -508,9 +546,11 @@ export function App() {
             const mtrRes = await api.fetchMarketplaceOrders(currentBizId);
             if (mtrRes && mtrRes.data) {
               setMarketplaceOrders(mtrRes.data);
+            } else {
+              setMarketplaceOrders([]);
             }
           } catch {
-            // Keep existing
+            setMarketplaceOrders([]);
           }
 
           // Fetch real GSTR-1 statutory summary from Cloud
@@ -725,6 +765,62 @@ export function App() {
       alert("Failed to save invoice: " + (err.message || "Please check required fields."));
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleSelectBusiness = (b: BusinessProfile) => {
+    setActiveBusinessId(b.id);
+    setLegalName(b.legal_name || "");
+    setTradeName(b.trade_name || b.legal_name || "");
+    setPanNumber(b.pan || "");
+    setBizEmail(b.email || currentUser?.email || "");
+    setBizPhone(b.phone || "");
+    if (b.gstins && b.gstins.length > 0) {
+      const g = b.gstins[0];
+      setPrimaryGstin(g.gstin);
+      setStateCode(g.state_code);
+      setStateName(g.state_name);
+      setActiveGstinId(g.id);
+    } else {
+      setPrimaryGstin("");
+      setActiveGstinId("");
+    }
+    setIsCompanyDropdownOpen(false);
+    refreshCloudData(b.id);
+  };
+
+  const handleCreateNewBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLegalName.trim()) {
+      setCreateCompanyError("Please enter a legal business name.");
+      return;
+    }
+    setIsCreatingCompany(true);
+    setCreateCompanyError("");
+    try {
+      const res = await api.createBusiness({
+        organization_id: activeOrgId || undefined,
+        legal_name: newLegalName.trim(),
+        trade_name: newTradeName.trim() || newLegalName.trim(),
+        pan: newPan.trim() || undefined,
+        gstin: newGstin.trim() || undefined,
+        state_code: newStateCode,
+        state_name: newStateName,
+        email: currentUser?.email
+      });
+      if (res && res.business) {
+        setShowNewCompanyModal(false);
+        setIsCompanyDropdownOpen(false);
+        setNewLegalName("");
+        setNewTradeName("");
+        setNewGstin("");
+        setNewPan("");
+        await refreshCloudData(res.business.id);
+      }
+    } catch (err: any) {
+      setCreateCompanyError(err.message || "Failed to create company.");
+    } finally {
+      setIsCreatingCompany(false);
     }
   };
 
@@ -1029,12 +1125,132 @@ export function App() {
           <X size={18} />
         </button>
       </div>
-      <div className="business" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <Building2 size={14} style={{ color: "#2878e5" }} />
-          <span style={{ fontWeight: 600 }}>{tradeName || legalName || currentUser?.name || "My Business"}</span>
+      <div style={{ position: "relative", zIndex: 100 }}>
+        <div
+          className="business"
+          onClick={() => setIsCompanyDropdownOpen((prev) => !prev)}
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: isCompanyDropdownOpen ? "#245799" : "#1b4b86",
+            border: isCompanyDropdownOpen ? "1px solid #3b82f6" : "1px solid transparent",
+            transition: "all 0.15s ease",
+            userSelect: "none"
+          }}
+          title="Click to switch or create company"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+            <Building2 size={15} style={{ color: "#60a5fa", flexShrink: 0 }} />
+            <div style={{ minWidth: 0, overflow: "hidden", textAlign: "left" }}>
+              <span style={{ fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#fff", fontSize: "12px" }}>
+                {tradeName || legalName || currentUser?.name || "My Business"}
+              </span>
+              <small style={{ color: "#93c5fd", fontSize: "10px", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {primaryGstin ? primaryGstin : (userBusinesses.length > 1 ? `${userBusinesses.length} companies available` : "Default Entity")}
+              </small>
+            </div>
+          </div>
+          <ChevronDown
+            size={14}
+            style={{
+              color: "#93c5fd",
+              transform: isCompanyDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.18s ease",
+              flexShrink: 0,
+              marginLeft: "6px"
+            }}
+          />
         </div>
-        <ChevronDown size={14} />
+
+        {/* Floating Company Switcher Popup */}
+        {isCompanyDropdownOpen && (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% - 10px)",
+              left: "3px",
+              right: "3px",
+              background: "#123460",
+              border: "1px solid #2b5d9b",
+              borderRadius: "10px",
+              boxShadow: "0 14px 28px rgba(0,0,0,0.5)",
+              padding: "8px",
+              zIndex: 999
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 6px 8px", borderBottom: "1px solid rgba(255,255,255,0.1)", marginBottom: "6px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Switch Company ({userBusinesses.length || 1})
+              </span>
+            </div>
+
+            <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+              {userBusinesses.map((b) => {
+                const isSelected = b.id === activeBusinessId;
+                const gstin = b.gstins && b.gstins.length > 0 ? b.gstins[0].gstin : b.pan ? `PAN: ${b.pan}` : null;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => handleSelectBusiness(b)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: "7px",
+                      background: isSelected ? "#2563eb" : "rgba(255,255,255,0.06)",
+                      border: "none",
+                      color: "#fff",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      textAlign: "left",
+                      transition: "all 0.12s ease"
+                    }}
+                  >
+                    <div style={{ minWidth: 0, overflow: "hidden" }}>
+                      <div style={{ fontWeight: 600, fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {b.trade_name || b.legal_name}
+                      </div>
+                      <div style={{ fontSize: "10px", color: isSelected ? "#bfdbfe" : "#94a3b8" }}>
+                        {gstin || "Regular Entity"}
+                      </div>
+                    </div>
+                    {isSelected && <Check size={14} style={{ color: "#fff", flexShrink: 0, marginLeft: "4px" }} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsCompanyDropdownOpen(false);
+                setShowNewCompanyModal(true);
+              }}
+              style={{
+                width: "100%",
+                marginTop: "8px",
+                padding: "8px",
+                borderRadius: "7px",
+                background: "rgba(37, 99, 235, 0.2)",
+                border: "1px dashed #60a5fa",
+                color: "#93c5fd",
+                fontSize: "11px",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px"
+              }}
+            >
+              <Plus size={13} /> Add New Company
+            </button>
+          </div>
+        )}
       </div>
       <nav>
         {nav.map(([name, Icon]) => (
@@ -2625,6 +2841,278 @@ export function App() {
           </footer>
         </main>
       </div>
+
+      {/* ================= NEW COMPANY MODAL ================= */}
+      {showNewCompanyModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "grid",
+            placeItems: "center",
+            padding: "20px"
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isCreatingCompany) {
+              setShowNewCompanyModal(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              overflow: "hidden",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            <div
+              style={{
+                padding: "18px 24px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    background: "#eff6ff",
+                    color: "#2563eb",
+                    display: "grid",
+                    placeItems: "center"
+                  }}
+                >
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "16px", color: "#0f172a", fontWeight: "700" }}>
+                    Create New Company
+                  </h3>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
+                    Add another business profile or GSTIN branch to your account.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewCompanyModal(false)}
+                disabled={isCreatingCompany}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "4px"
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewBusiness} style={{ padding: "20px 24px" }}>
+              {createCompanyError && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    color: "#b91c1c",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    marginBottom: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                >
+                  <AlertCircle size={15} />
+                  <span>{createCompanyError}</span>
+                </div>
+              )}
+
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                    Legal Business Name <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Jasim Global Exports"
+                    value={newLegalName}
+                    onChange={(e) => setNewLegalName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "9px 12px",
+                      borderRadius: "7px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                      Trade Name / Brand (DBA)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Jasim Store"
+                      value={newTradeName}
+                      onChange={(e) => setNewTradeName(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        borderRadius: "7px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        outline: "none",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                      PAN Number (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="e.g. ABCDE1234F"
+                      value={newPan}
+                      onChange={(e) => setNewPan(e.target.value.toUpperCase())}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        borderRadius: "7px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        outline: "none",
+                        textTransform: "uppercase",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                      GSTIN (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={15}
+                      placeholder="15-digit GSTIN (optional)"
+                      value={newGstin}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setNewGstin(val);
+                        if (val.length >= 2) {
+                          setNewStateCode(val.slice(0, 2));
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        borderRadius: "7px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        outline: "none",
+                        textTransform: "uppercase",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                      State / Place of Supply
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. West Bengal (19)"
+                      value={`${newStateName} (${newStateCode})`}
+                      onChange={(e) => setNewStateName(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        borderRadius: "7px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        outline: "none",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "24px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px"
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={isCreatingCompany}
+                  onClick={() => setShowNewCompanyModal(false)}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: "7px",
+                    border: "1px solid #cbd5e1",
+                    background: "#f8fafc",
+                    color: "#475569",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingCompany}
+                  style={{
+                    padding: "9px 20px",
+                    borderRadius: "7px",
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: isCreatingCompany ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <Plus size={14} />
+                  {isCreatingCompany ? "Creating Company..." : "Create Company"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

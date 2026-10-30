@@ -230,6 +230,36 @@ class QuantumApiClient {
     return res.json();
   }
 
+  async fetchBusinesses(): Promise<{ data: BusinessProfile[] }> {
+    const res = await fetch(`${API_BASE}/businesses`, {
+      headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
+  async createBusiness(data: {
+    legal_name: string;
+    trade_name?: string;
+    pan?: string;
+    gstin?: string;
+    state_code?: string;
+    state_name?: string;
+    email?: string;
+    phone?: string;
+    organization_id?: string;
+  }): Promise<{ message: string; business: BusinessProfile }> {
+    const res = await fetch(`${API_BASE}/businesses`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to create company.");
+    }
+    return json;
+  }
+
   async createInvoice(data: Record<string, unknown>) {
     const res = await fetch(`${API_BASE}/invoices`, {
       method: "POST",

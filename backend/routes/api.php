@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\GstinController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -31,6 +32,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        // Businesses Master (Multi-company)
+        Route::get('/businesses', [BusinessController::class, 'index']);
+        Route::post('/businesses', [BusinessController::class, 'store']);
 
         // GSTIN Registrations
         Route::get('/gstins', [GstinController::class, 'index']);
