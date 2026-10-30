@@ -64,3 +64,8 @@ seed_*.json
 
 quantum-gst-ui/
 *.png
+
+# Planning & Internal Notes
+*plan*.md
+*.plan.md
+*PLAN*.md

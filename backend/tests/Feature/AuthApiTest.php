@@ -111,3 +111,4 @@ class AuthApiTest extends TestCase
                        ]);
     }
 }
+
