@@ -581,9 +581,81 @@ td a {
   border-bottom: 1px solid #e3eaf2;
   margin-bottom: 17px;
   color: #2878e5;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   gap: 20px;
+}
+
+.tabs a,
+.tabs button,
+.tabs span {
+  color: #64748b;
+  text-decoration: none;
+  cursor: pointer;
+  padding-bottom: 8px;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-size: 12px;
+}
+
+.tabs a:hover,
+.tabs button:hover,
+.tabs span:hover {
+  color: #2563eb;
+}
+
+.tabs a.active,
+.tabs button.active,
+.tabs span.active {
+  color: #2563eb;
+  font-weight: 700;
+  border-bottom: 2px solid #2563eb;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  color: #475569;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+
+.settings-nav-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.settings-nav-item.active {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+  border-color: #bfdbfe;
+}
+
+.settingslayout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .settingslayout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .importbox {

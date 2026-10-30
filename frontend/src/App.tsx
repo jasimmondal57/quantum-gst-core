@@ -42,7 +42,11 @@ import {
   ExternalLink,
   ShieldCheck,
   GitBranch,
-  LogOut
+  LogOut,
+  CreditCard,
+  Truck,
+  Palette,
+  Trash2
 } from "lucide-react";
 import { AuthScreen } from "./components/AuthScreen";
 import { api } from "./services/api";
@@ -109,11 +113,62 @@ export const SLUG_TO_PAGE: Record<string, Page> = {
   "/inventory": "Inventory",
   "/products": "Inventory",
   "/settings": "Settings",
+  "/settings/business": "Settings",
+  "/settings/profile": "Settings",
+  "/settings/address": "Settings",
+  "/settings/invoicing": "Settings",
+  "/settings/bank": "Settings",
+  "/settings/eway": "Settings",
+  "/settings/templates": "Settings",
+  "/settings/roles": "Settings",
+  "/settings/users": "Settings",
+  "/settings/gst": "Settings",
+  "/settings/integrations": "Settings",
+  "/settings/billing": "Settings",
   "/invoice-preview": "InvoicePreview",
   "/invoices/preview": "InvoicePreview",
   "/updates": "Version & Updates",
   "/version": "Version & Updates"
 };
+
+export type SettingsSubmenu =
+  | "business"
+  | "address"
+  | "invoicing"
+  | "bank"
+  | "eway"
+  | "templates"
+  | "roles"
+  | "gst"
+  | "integrations"
+  | "billing";
+
+export const SETTINGS_SUBMENU_SLUGS: Record<SettingsSubmenu, string> = {
+  business: "/settings/business",
+  address: "/settings/address",
+  invoicing: "/settings/invoicing",
+  bank: "/settings/bank",
+  eway: "/settings/eway",
+  templates: "/settings/templates",
+  roles: "/settings/roles",
+  gst: "/settings/gst",
+  integrations: "/settings/integrations",
+  billing: "/settings/billing"
+};
+
+export function getSettingsSubmenuFromPath(pathname: string): SettingsSubmenu {
+  const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/settings/address") return "address";
+  if (clean === "/settings/invoicing") return "invoicing";
+  if (clean === "/settings/bank") return "bank";
+  if (clean === "/settings/eway") return "eway";
+  if (clean === "/settings/templates") return "templates";
+  if (clean === "/settings/roles" || clean === "/settings/users") return "roles";
+  if (clean === "/settings/gst") return "gst";
+  if (clean === "/settings/integrations") return "integrations";
+  if (clean === "/settings/billing") return "billing";
+  return "business";
+}
 
 export function getPageFromPath(pathname: string): Page {
   const clean = pathname.replace(/\/+$/, "") || "/";
@@ -273,16 +328,19 @@ function Table({
 function Field({
   label,
   value,
-  onChange
+  onChange,
+  type = "text"
 }: {
   label: string;
   value: string;
   onChange?: (val: string) => void;
+  type?: string;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
       <input
+        type={type}
         value={value}
         onChange={(e) => onChange && onChange(e.target.value)}
       />
@@ -363,9 +421,65 @@ export function App() {
     return "Dashboard";
   });
 
+  const [settingsSubmenu, setSettingsSubmenuState] = useState<SettingsSubmenu>(() => {
+    if (typeof window !== "undefined") {
+      return getSettingsSubmenuFromPath(window.location.pathname);
+    }
+    return "business";
+  });
+
+  const [settingsSaveMsg, setSettingsSaveMsg] = useState<string>("");
+
+  const showSaveSuccess = (msg: string = "Settings saved successfully!") => {
+    setSettingsSaveMsg(msg);
+    setTimeout(() => setSettingsSaveMsg(""), 3500);
+  };
+
+  const navigateToSettingsSubmenu = (sub: SettingsSubmenu, replace: boolean = false) => {
+    setSettingsSubmenuState(sub);
+    setPageState("Settings");
+    if (typeof window !== "undefined") {
+      const slug = SETTINGS_SUBMENU_SLUGS[sub] || "/settings/business";
+      if (window.location.pathname !== slug) {
+        if (replace) {
+          window.history.replaceState({ page: "Settings", submenu: sub }, "", slug);
+        } else {
+          window.history.pushState({ page: "Settings", submenu: sub }, "", slug);
+        }
+      }
+      const labelMap: Record<SettingsSubmenu, string> = {
+        business: "Business Details",
+        address: "Address & Contacts",
+        invoicing: "Invoice Settings",
+        bank: "Bank Details",
+        eway: "E-Way Bill Settings",
+        templates: "Document Templates",
+        roles: "Users & Roles",
+        gst: "GST Settings",
+        integrations: "Integrations",
+        billing: "Billing & Subscription"
+      };
+      document.title = `Quantum GST - Settings: ${labelMap[sub] || "Business Profile"}`;
+    }
+  };
+
   const setPage = (newPage: Page, replace: boolean = false) => {
     setPageState(newPage);
     if (typeof window !== "undefined") {
+      if (newPage === "Settings") {
+        const sub = getSettingsSubmenuFromPath(window.location.pathname);
+        setSettingsSubmenuState(sub);
+        const slug = window.location.pathname.startsWith("/settings/") ? window.location.pathname : SETTINGS_SUBMENU_SLUGS[sub];
+        if (window.location.pathname !== slug) {
+          if (replace) {
+            window.history.replaceState({ page: newPage, submenu: sub }, "", slug);
+          } else {
+            window.history.pushState({ page: newPage, submenu: sub }, "", slug);
+          }
+        }
+        document.title = "Quantum GST - Settings";
+        return;
+      }
       const slug = PAGE_SLUGS[newPage] || "/dashboard";
       if (window.location.pathname !== slug) {
         if (replace) {
@@ -382,9 +496,17 @@ export function App() {
     // Initial URL sync and popstate listener for back/forward browser buttons
     if (typeof window !== "undefined") {
       const initialPage = getPageFromPath(window.location.pathname);
-      const targetSlug = PAGE_SLUGS[initialPage] || "/dashboard";
-      if (window.location.pathname !== targetSlug && window.location.pathname === "/") {
-        window.history.replaceState({ page: initialPage }, "", targetSlug);
+      if (initialPage === "Settings") {
+        const sub = getSettingsSubmenuFromPath(window.location.pathname);
+        setSettingsSubmenuState(sub);
+        if (window.location.pathname === "/settings") {
+          window.history.replaceState({ page: "Settings", submenu: "business" }, "", "/settings/business");
+        }
+      } else {
+        const targetSlug = PAGE_SLUGS[initialPage] || "/dashboard";
+        if (window.location.pathname !== targetSlug && window.location.pathname === "/") {
+          window.history.replaceState({ page: initialPage }, "", targetSlug);
+        }
       }
       document.title = initialPage === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${initialPage}`;
     }
@@ -393,13 +515,69 @@ export function App() {
       if (typeof window !== "undefined") {
         const p = getPageFromPath(window.location.pathname);
         setPageState(p);
-        document.title = p === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${p}`;
+        if (p === "Settings") {
+          const sub = getSettingsSubmenuFromPath(window.location.pathname);
+          setSettingsSubmenuState(sub);
+          const labelMap: Record<SettingsSubmenu, string> = {
+            business: "Business Details",
+            address: "Address & Contacts",
+            invoicing: "Invoice Settings",
+            bank: "Bank Details",
+            eway: "E-Way Bill Settings",
+            templates: "Document Templates",
+            roles: "Users & Roles",
+            gst: "GST Settings",
+            integrations: "Integrations",
+            billing: "Billing & Subscription"
+          };
+          document.title = `Quantum GST - Settings: ${labelMap[sub] || "Business Profile"}`;
+        } else {
+          document.title = p === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${p}`;
+        }
       }
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // Settings Submenu Specific States
+  const [bankName, setBankName] = useState("HDFC Bank");
+  const [accountNumber, setAccountNumber] = useState("50200019283746");
+  const [ifscCode, setIfscCode] = useState("HDFC0001234");
+  const [branchName, setBranchName] = useState("Park Circus Commercial Branch");
+  const [upiId, setUpiId] = useState("quantumgst@hdfcbank");
+  const [accountHolderName, setAccountHolderName] = useState("");
+
+  const [ewayThreshold, setEwayThreshold] = useState("50000");
+  const [autoEway, setAutoEway] = useState(true);
+  const [ewayDistanceCalc, setEwayDistanceCalc] = useState(true);
+  const [ewayUsername, setEwayUsername] = useState("QUANTUM_GST_USER");
+  const [ewayPassword, setEwayPassword] = useState("••••••••••••");
+  const [defaultTransporterId, setDefaultTransporterId] = useState("19AAACG0521F1ZX");
+
+  const [startingInvNum, setStartingInvNum] = useState("1001");
+  const [invoiceTerms, setInvoiceTerms] = useState(
+    "1. Goods once sold will not be taken back. 2. Interest @ 18% p.a. will be charged if payment is delayed beyond agreed terms. 3. Subject to local jurisdiction."
+  );
+  const [selectedTemplate, setSelectedTemplate] = useState<"standard" | "modern" | "compact" | "gst_detailed">("modern");
+  const [templateColor, setTemplateColor] = useState("#2563eb");
+  const [showLogoOnInvoice, setShowLogoOnInvoice] = useState(true);
+  const [showBankOnInvoice, setShowBankOnInvoice] = useState(true);
+
+  const [gstScheme, setGstScheme] = useState("Regular");
+  const [filingPeriodicity, setFilingPeriodicity] = useState("Monthly");
+  const [eInvoicingEnabled, setEInvoicingEnabled] = useState(false);
+  const [autoGstr2b, setAutoGstr2b] = useState(true);
+
+  const [teamMembers, setTeamMembers] = useState([
+    { id: 1, name: "Jasim Mondal", email: "jasimmondal57@gmail.com", role: "Owner / Administrator", status: "Active" },
+    { id: 2, name: "Accountant Senior", email: "finance@quantumgst.in", role: "Accountant", status: "Active" }
+  ]);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState("Accountant");
+  const [showAddMember, setShowAddMember] = useState(false);
 
   const [mobile, setMobile] = useState(false);
 
@@ -2450,54 +2628,641 @@ export function App() {
       <>
         <Heading
           title="Settings"
-          sub="Manage your business settings"
+          sub="Manage your company profile, statutory tax configuration, and system preferences"
         />
         <div className="tabs">
-          <span style={{ fontWeight: "bold" }}>Business Profile</span>
-          <span>Users & Roles</span>
-          <span>GST Settings</span>
-          <span>Integrations</span>
-          <span>Billing</span>
+          <a
+            href="/settings/business"
+            className={["business", "address", "invoicing", "bank", "eway", "templates"].includes(settingsSubmenu) ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToSettingsSubmenu("business");
+            }}
+          >
+            Business Profile
+          </a>
+          <a
+            href="/settings/roles"
+            className={settingsSubmenu === "roles" ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToSettingsSubmenu("roles");
+            }}
+          >
+            Users & Roles
+          </a>
+          <a
+            href="/settings/gst"
+            className={settingsSubmenu === "gst" ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToSettingsSubmenu("gst");
+            }}
+          >
+            GST Settings
+          </a>
+          <a
+            href="/settings/integrations"
+            className={settingsSubmenu === "integrations" ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToSettingsSubmenu("integrations");
+            }}
+          >
+            Integrations
+          </a>
+          <a
+            href="/settings/billing"
+            className={settingsSubmenu === "billing" ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToSettingsSubmenu("billing");
+            }}
+          >
+            Billing & Subscription
+          </a>
         </div>
-        <div className="formlayout">
+
+        {settingsSaveMsg && (
+          <div style={{ marginBottom: "16px", padding: "10px 16px", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: "8px", color: "#065f46", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <CheckCircle2 size={16} /> {settingsSaveMsg}
+          </div>
+        )}
+
+        <div className="settingslayout">
           <Panel title="Settings Navigation">
-            <div style={{ lineHeight: "2.4", fontSize: "11px" }}>
-              <b style={{ color: "#2878e5", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <Building2 size={13} /> Business Details
-              </b><br />
-              Address & Contacts<br />
-              Invoice Settings<br />
-              Bank Details<br />
-              E-way Bill Settings<br />
-              Document Templates
-            </div>
-          </Panel>
-          <Panel title="Business Details">
-            <div className="fields" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              <Field label="Business Name" value={legalName} onChange={setLegalName} />
-              <Field label="Trade Name" value={tradeName} onChange={setTradeName} />
-              <Field label="GSTIN" value={primaryGstin} onChange={setPrimaryGstin} />
-              <Field label="Business Type" value={bizType.toUpperCase()} />
-              <Field label="PAN" value={panNumber} onChange={setPanNumber} />
-              <Field label="State" value={`${stateName} (${stateCode})`} />
-            </div>
-            <div className="save" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Btn secondary onClick={handleManualCheckUpdate}>
-                  <RefreshCw size={13} className={checkingUpdate ? "spin" : ""} style={{ marginRight: "4px" }} />
-                  Check for Updates
-                </Btn>
-                {updateCheckMsg && (
-                  <span style={{ fontSize: "11px", color: updateCheckMsg.includes("found") ? "#0d9f91" : "#718096", fontWeight: "500" }}>
-                    {updateCheckMsg}
-                  </span>
-                )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#94a3b8", padding: "4px 8px 6px", letterSpacing: "0.5px" }}>
+                Profile & Logistics
               </div>
-              <Btn onClick={() => alert("Company settings saved successfully!")}>
-                Update
-              </Btn>
+              <a
+                href="/settings/business"
+                className={`settings-nav-item ${settingsSubmenu === "business" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("business"); }}
+              >
+                <Building2 size={15} /> Business Details
+              </a>
+              <a
+                href="/settings/address"
+                className={`settings-nav-item ${settingsSubmenu === "address" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("address"); }}
+              >
+                <MapPin size={15} /> Address & Contacts
+              </a>
+              <a
+                href="/settings/invoicing"
+                className={`settings-nav-item ${settingsSubmenu === "invoicing" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("invoicing"); }}
+              >
+                <ReceiptText size={15} /> Invoice Settings
+              </a>
+              <a
+                href="/settings/bank"
+                className={`settings-nav-item ${settingsSubmenu === "bank" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("bank"); }}
+              >
+                <CreditCard size={15} /> Bank Details
+              </a>
+              <a
+                href="/settings/eway"
+                className={`settings-nav-item ${settingsSubmenu === "eway" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("eway"); }}
+              >
+                <Truck size={15} /> E-way Bill Settings
+              </a>
+              <a
+                href="/settings/templates"
+                className={`settings-nav-item ${settingsSubmenu === "templates" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("templates"); }}
+              >
+                <Palette size={15} /> Document Templates
+              </a>
+
+              <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#94a3b8", padding: "12px 8px 6px", letterSpacing: "0.5px", borderTop: "1px solid #f1f5f9", marginTop: "6px" }}>
+                Compliance & Admin
+              </div>
+              <a
+                href="/settings/roles"
+                className={`settings-nav-item ${settingsSubmenu === "roles" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("roles"); }}
+              >
+                <Users size={15} /> Users & Roles
+              </a>
+              <a
+                href="/settings/gst"
+                className={`settings-nav-item ${settingsSubmenu === "gst" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("gst"); }}
+              >
+                <FileCheck size={15} /> GST Settings
+              </a>
+              <a
+                href="/settings/integrations"
+                className={`settings-nav-item ${settingsSubmenu === "integrations" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("integrations"); }}
+              >
+                <Plug size={15} /> Integrations
+              </a>
+              <a
+                href="/settings/billing"
+                className={`settings-nav-item ${settingsSubmenu === "billing" ? "active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigateToSettingsSubmenu("billing"); }}
+              >
+                <ShieldCheck size={15} /> Billing & Plan
+              </a>
             </div>
           </Panel>
+
+          {settingsSubmenu === "business" && (
+            <Panel title="Business Details" sub="Configure registered legal business identity, trade name, and tax classification">
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <Field label="Legal Business Name *" value={legalName} onChange={setLegalName} />
+                <Field label="Trade Name" value={tradeName} onChange={setTradeName} />
+                <Field label="GSTIN *" value={primaryGstin} onChange={setPrimaryGstin} />
+                <div className="field">
+                  <label>Business Type</label>
+                  <select
+                    value={bizType}
+                    onChange={(e) => setBizType(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="proprietorship">Sole Proprietorship</option>
+                    <option value="partnership">Partnership Firm</option>
+                    <option value="llp">Limited Liability Partnership (LLP)</option>
+                    <option value="private_limited">Private Limited Company (Pvt Ltd)</option>
+                    <option value="public_limited">Public Limited Company</option>
+                    <option value="huf">Hindu Undivided Family (HUF)</option>
+                  </select>
+                </div>
+                <Field label="Permanent Account Number (PAN)" value={panNumber} onChange={setPanNumber} />
+                <Field label="Registered State" value={`${stateName} (${stateCode})`} />
+              </div>
+              <div className="save" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Btn secondary onClick={handleManualCheckUpdate}>
+                    <RefreshCw size={13} className={checkingUpdate ? "spin" : ""} style={{ marginRight: "4px" }} />
+                    Check for Updates
+                  </Btn>
+                  {updateCheckMsg && (
+                    <span style={{ fontSize: "11px", color: updateCheckMsg.includes("found") ? "#0d9f91" : "#718096", fontWeight: "500" }}>
+                      {updateCheckMsg}
+                    </span>
+                  )}
+                </div>
+                <Btn onClick={() => showSaveSuccess("Business Profile updated successfully!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save Business Details
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "address" && (
+            <Panel title="Address & Official Contacts" sub="Primary registered place of business printed on invoices and used for Place of Supply">
+              <div className="fields" style={{ gridTemplateColumns: "1fr", gap: "16px", marginBottom: "16px" }}>
+                <Field label="Principal Place of Business (Address) *" value={addressLine} onChange={setAddressLine} />
+              </div>
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <Field label="City / District *" value={city} onChange={setCity} />
+                <Field label="State *" value={stateName} onChange={setStateName} />
+                <Field label="Postal PIN Code *" value={pincode} onChange={setPincode} />
+                <Field label="Official Business Email *" value={bizEmail} onChange={setBizEmail} />
+                <Field label="Contact Phone / Mobile *" value={bizPhone} onChange={setBizPhone} />
+                <Field label="GST State Code" value={stateCode} onChange={setStateCode} />
+              </div>
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("Address and contact details saved!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save Address & Contacts
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "invoicing" && (
+            <Panel title="Invoice & Billing Settings" sub="Configure automatic serial numbering, payment terms, and default declarations">
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                <Field label="Invoice Prefix (e.g., INV/26-27/)" value={invoicePrefix} onChange={setInvoicePrefix} />
+                <Field label="Starting Sequence Number" value={startingInvNum} onChange={setStartingInvNum} />
+                <div className="field">
+                  <label>Default Payment Terms</label>
+                  <select
+                    value={paymentTerms}
+                    onChange={(e) => setPaymentTerms(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="Immediate">Immediate / Due on Receipt</option>
+                    <option value="Net 7">Net 7 Days</option>
+                    <option value="Net 15">Net 15 Days</option>
+                    <option value="Net 30">Net 30 Days</option>
+                    <option value="Net 45">Net 45 Days</option>
+                    <option value="Net 60">Net 60 Days</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Default Currency & Format</label>
+                  <input
+                    type="text"
+                    disabled
+                    value="INR (₹) - Indian Rupee Lakhs/Crores"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", background: "#f8fafc", color: "#64748b" }}
+                  />
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: "20px" }}>
+                <label>Default Terms & Conditions / Declaration</label>
+                <textarea
+                  rows={3}
+                  value={invoiceTerms}
+                  onChange={(e) => setInvoiceTerms(e.target.value)}
+                  style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", resize: "vertical", fontFamily: "inherit" }}
+                />
+              </div>
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("Invoice sequence and payment terms updated!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save Invoice Settings
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "bank" && (
+            <Panel title="Bank Account & Payment Details" sub="These bank credentials and UPI ID will be printed on invoices so customers can pay directly">
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <Field label="Bank Name *" value={bankName} onChange={setBankName} />
+                <Field label="Account Holder Name *" value={accountHolderName || legalName || "Company Account"} onChange={setAccountHolderName} />
+                <Field label="Bank Account Number *" value={accountNumber} onChange={setAccountNumber} />
+                <Field label="IFSC Code *" value={ifscCode} onChange={setIfscCode} />
+                <Field label="Branch Name" value={branchName} onChange={setBranchName} />
+                <Field label="UPI ID / VPA (for QR Code on Invoice)" value={upiId} onChange={setUpiId} />
+              </div>
+              <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <Sparkles size={16} style={{ color: "#2563eb" }} />
+                <span style={{ fontSize: "12px", color: "#475569" }}>
+                  Dynamic UPI QR codes are automatically rendered on PDF invoices using the UPI ID and exact payable amount.
+                </span>
+              </div>
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("Bank details and UPI settings saved!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save Bank Details
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "eway" && (
+            <Panel title="E-Way Bill & Logistics Settings" sub="Automated E-way bill generation parameters and NIC portal setup">
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <div className="field">
+                  <label>E-Way Bill Mandatory Threshold</label>
+                  <select
+                    value={ewayThreshold}
+                    onChange={(e) => setEwayThreshold(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="50000">₹ 50,000 (Standard All-India Threshold)</option>
+                    <option value="100000">₹ 1,00,000 (Intra-state High Threshold states)</option>
+                  </select>
+                </div>
+                <Field label="NIC Portal Username / API User" value={ewayUsername} onChange={setEwayUsername} />
+                <Field label="NIC Portal Password" type="password" value={ewayPassword} onChange={setEwayPassword} />
+                <Field label="Default Transporter ID / GSTIN" value={defaultTransporterId} onChange={setDefaultTransporterId} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={autoEway} onChange={(e) => setAutoEway(e.target.checked)} />
+                  <span>Auto-generate E-way Bill when invoice value exceeds ₹{Number(ewayThreshold).toLocaleString()}</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ewayDistanceCalc} onChange={(e) => setEwayDistanceCalc(e.target.checked)} />
+                  <span>Calculate transit distance automatically using Source and Destination PIN codes</span>
+                </label>
+              </div>
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("E-Way Bill rules and credentials updated!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save E-Way Bill Settings
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "templates" && (
+            <Panel title="Document & Invoice Templates" sub="Choose visual styling, brand color, and layout for PDF tax invoices and quotes">
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "600", marginBottom: "10px", color: "#334155" }}>Select Invoice Layout Theme</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" }}>
+                  {[
+                    { id: "modern", name: "Modern Sapphire", desc: "Clean modern design with crisp tables & QR code" },
+                    { id: "standard", name: "Classic Corporate", desc: "Formal layout preferred by institutional buyers" },
+                    { id: "compact", name: "Compact Thermal", desc: "Space-saving for retail POS & fast counter prints" },
+                    { id: "gst_detailed", name: "GST Tax Detailed", desc: "Detailed HSN/SAC breakups & CGST/SGST/IGST breakdown" }
+                  ].map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTemplate(t.id as any)}
+                      style={{
+                        padding: "14px",
+                        borderRadius: "8px",
+                        border: `2px solid ${selectedTemplate === t.id ? "#2563eb" : "#e2e8f0"}`,
+                        background: selectedTemplate === t.id ? "#eff6ff" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      <div style={{ fontWeight: "700", fontSize: "13px", color: selectedTemplate === t.id ? "#1d4ed8" : "#0f172a", marginBottom: "4px" }}>
+                        {t.name}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#64748b", lineHeight: "1.4" }}>{t.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "600", marginBottom: "10px", color: "#334155" }}>Brand Accent Color</div>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {[
+                    { color: "#2563eb", name: "Blue" },
+                    { color: "#0d9f91", name: "Teal" },
+                    { color: "#7c3aed", name: "Purple" },
+                    { color: "#dc2626", name: "Ruby" },
+                    { color: "#0f172a", name: "Slate" }
+                  ].map((c) => (
+                    <button
+                      key={c.color}
+                      type="button"
+                      onClick={() => setTemplateColor(c.color)}
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: c.color,
+                        border: templateColor === c.color ? "3px solid #000" : "2px solid #fff",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                        cursor: "pointer"
+                      }}
+                      title={c.name}
+                    />
+                  ))}
+                  <span style={{ fontSize: "12px", color: "#64748b", marginLeft: "10px" }}>Selected: {templateColor}</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={showLogoOnInvoice} onChange={(e) => setShowLogoOnInvoice(e.target.checked)} />
+                  <span>Show Business Logo on Invoice Header</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={showBankOnInvoice} onChange={(e) => setShowBankOnInvoice(e.target.checked)} />
+                  <span>Print Bank Account & Payment QR Code at bottom</span>
+                </label>
+              </div>
+
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("Invoice template styling saved!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save Template Preferences
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "roles" && (
+            <Panel
+              title="Users & Access Permissions"
+              sub="Manage team access, assign role-based permissions, and invite accountants"
+              action={
+                <Btn onClick={() => setShowAddMember(true)}>
+                  <Plus size={13} style={{ marginRight: "4px" }} /> Invite Member
+                </Btn>
+              }
+            >
+              {showAddMember && (
+                <div style={{ padding: "16px", borderRadius: "8px", background: "#f8fafc", border: "1px solid #cbd5e1", marginBottom: "20px" }}>
+                  <div style={{ fontWeight: "700", fontSize: "13px", marginBottom: "12px", color: "#0f172a" }}>Invite New Team Member</div>
+                  <div className="fields" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                    <Field label="Full Name *" value={newMemberName} onChange={setNewMemberName} />
+                    <Field label="Email Address *" value={newMemberEmail} onChange={setNewMemberEmail} />
+                    <div className="field">
+                      <label>Assigned Role</label>
+                      <select
+                        value={newMemberRole}
+                        onChange={(e) => setNewMemberRole(e.target.value)}
+                        style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                      >
+                        <option value="Administrator">Administrator (Full Access)</option>
+                        <option value="Accountant">Accountant (GST & Books)</option>
+                        <option value="Billing Operator">Billing Operator (Invoices Only)</option>
+                        <option value="Auditor / Viewer">Auditor / Read-Only</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                    <Btn secondary onClick={() => setShowAddMember(false)}>Cancel</Btn>
+                    <Btn onClick={() => {
+                      if (!newMemberName || !newMemberEmail) {
+                        alert("Please enter both name and email.");
+                        return;
+                      }
+                      setTeamMembers([
+                        ...teamMembers,
+                        { id: Date.now(), name: newMemberName, email: newMemberEmail, role: newMemberRole, status: "Invited" }
+                      ]);
+                      setNewMemberName("");
+                      setNewMemberEmail("");
+                      setShowAddMember(false);
+                      showSaveSuccess(`Invitation email sent to ${newMemberEmail}`);
+                    }}>
+                      Send Invitation
+                    </Btn>
+                  </div>
+                </div>
+              )}
+
+              <div className="tablewrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMembers.map((m) => (
+                      <tr key={m.id}>
+                        <td><strong>{m.name}</strong></td>
+                        <td>{m.email}</td>
+                        <td>
+                          <span style={{ padding: "3px 8px", borderRadius: "4px", background: "#eff6ff", color: "#2563eb", fontSize: "11px", fontWeight: "600" }}>
+                            {m.role}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ padding: "3px 8px", borderRadius: "999px", background: m.status === "Active" ? "#ecfdf5" : "#fef3c7", color: m.status === "Active" ? "#059669" : "#b45309", fontSize: "11px", fontWeight: "600" }}>
+                            {m.status}
+                          </span>
+                        </td>
+                        <td>
+                          {m.role.includes("Owner") ? (
+                            <span style={{ fontSize: "11px", color: "#94a3b8" }}>Primary Owner</span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove access for ${m.name}?`)) {
+                                  setTeamMembers(teamMembers.filter((item) => item.id !== m.id));
+                                  showSaveSuccess(`Removed access for ${m.name}`);
+                                }
+                              }}
+                              style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "gst" && (
+            <Panel title="GST Compliance & Return Parameters" sub="Configure return filing frequency, composite scheme eligibility, and automatic reconciliation">
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <div className="field">
+                  <label>GST Registration Scheme</label>
+                  <select
+                    value={gstScheme}
+                    onChange={(e) => setGstScheme(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="Regular">Regular Taxpayer</option>
+                    <option value="Composition">Composition Scheme (Quarterly CMP-08)</option>
+                    <option value="SEZ">Special Economic Zone (SEZ Developer / Unit)</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>GSTR-1 & 3B Filing Periodicity</label>
+                  <select
+                    value={filingPeriodicity}
+                    onChange={(e) => setFilingPeriodicity(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="Monthly">Monthly Filing (Turnover &gt; ₹5 Cr or Opted Monthly)</option>
+                    <option value="Quarterly">Quarterly (QRMP Scheme with Monthly IFF)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={eInvoicingEnabled} onChange={(e) => setEInvoicingEnabled(e.target.checked)} />
+                  <span>Mandatory e-Invoicing enabled (Generate IRN and signed QR code for all B2B invoices)</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={autoGstr2b} onChange={(e) => setAutoGstr2b(e.target.checked)} />
+                  <span>Automatic daily sync of GSTR-2B input tax credit (ITC) from GSTN Portal</span>
+                </label>
+              </div>
+
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => showSaveSuccess("GST filing parameters updated successfully!")}>
+                  <Save size={13} style={{ marginRight: "5px" }} /> Save GST Settings
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "integrations" && (
+            <Panel title="Marketplaces & Accounting Integrations" sub="Sync orders, customer GSTINs, and export entries directly to accounting systems">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+                {[
+                  { name: "Amazon India (SP-API)", desc: "Automated FBA & Easy Ship settlement invoice sync", status: "Connected", orders: "1,240 synced" },
+                  { name: "Flipkart Seller Hub", desc: "Order management & commission credit note sync", status: "Connected", orders: "850 synced" },
+                  { name: "Meesho Supplier Panel", desc: "Zero commission order reconciliation & TCS reports", status: "Connected", orders: "612 synced" },
+                  { name: "Shopify Store Webhook", desc: "Live real-time webhook for Shopify POS & Online store", status: "Active", orders: "Live Hook" },
+                  { name: "Tally Prime XML Export", desc: "1-Click export to Tally vouchers and daybooks", status: "Bridge Ready", orders: "ODBC Ready" },
+                  { name: "Zoho Books API", desc: "Bi-directional customer and payment settlement sync", status: "Available", orders: "OAuth 2.0" }
+                ].map((item) => (
+                  <div key={item.name} style={{ padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                      <div style={{ fontWeight: "700", fontSize: "13px", color: "#0f172a" }}>{item.name}</div>
+                      <span style={{ fontSize: "11px", fontWeight: "600", padding: "2px 8px", borderRadius: "999px", background: item.status === "Available" ? "#f1f5f9" : "#ecfdf5", color: item.status === "Available" ? "#64748b" : "#059669" }}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "11px", color: "#64748b", margin: "0 0 12px", lineHeight: "1.4" }}>{item.desc}</p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <small style={{ color: "#94a3b8", fontSize: "11px" }}>{item.orders}</small>
+                      <Btn secondary onClick={() => alert(`${item.name} settings are configured and active.`)}>Configure</Btn>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          {settingsSubmenu === "billing" && (
+            <Panel title="Subscription & Billing Plan" sub="Manage license tier, cloud database sync quota, and invoice history">
+              <div style={{ padding: "20px", borderRadius: "10px", background: "#eff6ff", border: "1px solid #bfdbfe", marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#2563eb", letterSpacing: "0.5px" }}>Current Active Plan</span>
+                    <h3 style={{ margin: "4px 0 0", fontSize: "20px", color: "#1e3a8a" }}>Quantum Core Professional Edition</h3>
+                  </div>
+                  <span style={{ fontSize: "12px", fontWeight: "700", padding: "4px 12px", borderRadius: "999px", background: "#dcfce7", color: "#15803d", border: "1px solid #86efac" }}>
+                    Active • Lifetime Updates
+                  </span>
+                </div>
+                <p style={{ fontSize: "12px", color: "#3b82f6", margin: "0 0 16px" }}>
+                  Includes unlimited B2B / B2C tax invoices, automated E-Way bills, multi-company switcher, and live GitHub OTA releases.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                  <div style={{ background: "#fff", padding: "12px", borderRadius: "8px", border: "1px solid #dbeafe" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>Monthly Invoices</div>
+                    <strong style={{ fontSize: "16px", color: "#0f172a" }}>Unlimited</strong>
+                  </div>
+                  <div style={{ background: "#fff", padding: "12px", borderRadius: "8px", border: "1px solid #dbeafe" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>Registered Companies</div>
+                    <strong style={{ fontSize: "16px", color: "#0f172a" }}>{userBusinesses.length || 1} Active</strong>
+                  </div>
+                  <div style={{ background: "#fff", padding: "12px", borderRadius: "8px", border: "1px solid #dbeafe" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>Cloud Sync Status</div>
+                    <strong style={{ fontSize: "16px", color: "#059669" }}>Connected (100%)</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="tablewrap">
+                <div style={{ fontWeight: "700", fontSize: "13px", padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Subscription Invoices</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Invoice ID</th>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Amount</th>
+                      <th>Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>QTM-SUB-2026-01</strong></td>
+                      <td>01 Apr 2026</td>
+                      <td>Quantum GST Core Professional - Annual License</td>
+                      <td>₹ 4,999.00</td>
+                      <td>
+                        <a href="#receipt" onClick={(e) => { e.preventDefault(); alert("Downloading payment receipt PDF..."); }} style={{ color: "#2563eb", fontWeight: "600" }}>
+                          Download PDF
+                        </a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
         </div>
       </>
     );
