@@ -75,6 +75,51 @@ type Page =
   | "InvoicePreview"
   | "Version & Updates";
 
+export const PAGE_SLUGS: Record<Page, string> = {
+  "Dashboard": "/dashboard",
+  "Billing": "/billing",
+  "Sales": "/sales",
+  "Purchases": "/purchases",
+  "Marketplace": "/marketplace",
+  "Shopify": "/shopify",
+  "GST Reports": "/reports",
+  "Reconciliation": "/reconciliation",
+  "Contacts": "/contacts",
+  "Inventory": "/inventory",
+  "Settings": "/settings",
+  "InvoicePreview": "/invoice-preview",
+  "Version & Updates": "/updates"
+};
+
+export const SLUG_TO_PAGE: Record<string, Page> = {
+  "/": "Dashboard",
+  "/dashboard": "Dashboard",
+  "/billing": "Billing",
+  "/invoices/create": "Billing",
+  "/sales": "Sales",
+  "/invoices": "Sales",
+  "/purchases": "Purchases",
+  "/marketplace": "Marketplace",
+  "/shopify": "Shopify",
+  "/reports": "GST Reports",
+  "/gst-reports": "GST Reports",
+  "/reconciliation": "Reconciliation",
+  "/contacts": "Contacts",
+  "/customers": "Contacts",
+  "/inventory": "Inventory",
+  "/products": "Inventory",
+  "/settings": "Settings",
+  "/invoice-preview": "InvoicePreview",
+  "/invoices/preview": "InvoicePreview",
+  "/updates": "Version & Updates",
+  "/version": "Version & Updates"
+};
+
+export function getPageFromPath(pathname: string): Page {
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  return SLUG_TO_PAGE[clean] || "Dashboard";
+}
+
 const nav = [
   ["Dashboard", LayoutDashboard],
   ["Billing", ReceiptText],
@@ -311,7 +356,51 @@ export function App() {
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
   const [createCompanyError, setCreateCompanyError] = useState("");
 
-  const [page, setPage] = useState<Page>("Dashboard");
+  const [page, setPageState] = useState<Page>(() => {
+    if (typeof window !== "undefined") {
+      return getPageFromPath(window.location.pathname);
+    }
+    return "Dashboard";
+  });
+
+  const setPage = (newPage: Page, replace: boolean = false) => {
+    setPageState(newPage);
+    if (typeof window !== "undefined") {
+      const slug = PAGE_SLUGS[newPage] || "/dashboard";
+      if (window.location.pathname !== slug) {
+        if (replace) {
+          window.history.replaceState({ page: newPage }, "", slug);
+        } else {
+          window.history.pushState({ page: newPage }, "", slug);
+        }
+      }
+      document.title = newPage === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${newPage}`;
+    }
+  };
+
+  useEffect(() => {
+    // Initial URL sync and popstate listener for back/forward browser buttons
+    if (typeof window !== "undefined") {
+      const initialPage = getPageFromPath(window.location.pathname);
+      const targetSlug = PAGE_SLUGS[initialPage] || "/dashboard";
+      if (window.location.pathname !== targetSlug && window.location.pathname === "/") {
+        window.history.replaceState({ page: initialPage }, "", targetSlug);
+      }
+      document.title = initialPage === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${initialPage}`;
+    }
+
+    const handlePopState = () => {
+      if (typeof window !== "undefined") {
+        const p = getPageFromPath(window.location.pathname);
+        setPageState(p);
+        document.title = p === "Dashboard" ? "Quantum GST - Dashboard" : `Quantum GST - ${p}`;
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const [mobile, setMobile] = useState(false);
 
   // Invoice Form State
@@ -1253,19 +1342,26 @@ export function App() {
         )}
       </div>
       <nav>
-        {nav.map(([name, Icon]) => (
-          <button
-            key={name}
-            className={page === name ? "active" : ""}
-            onClick={() => {
-              setPage(name);
-              setMobile(false);
-            }}
-          >
-            <Icon size={17} />
-            {name}
-          </button>
-        ))}
+        {nav.map(([name, Icon]) => {
+          const slug = PAGE_SLUGS[name];
+          const isActive = page === name;
+          return (
+            <a
+              key={name}
+              href={slug}
+              className={isActive ? "active" : ""}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                setPage(name);
+                setMobile(false);
+              }}
+            >
+              <Icon size={17} />
+              {name}
+            </a>
+          );
+        })}
       </nav>
       <div className="support">
         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", fontWeight: "bold" }}>
@@ -1572,7 +1668,15 @@ export function App() {
               <button onClick={() => refreshCloudData()} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#2878e5" }}>
                 <RefreshCw size={12} className={isSyncing ? "spin" : ""} /> Refresh
               </button>
-              <a onClick={() => setPage("Sales")} style={{ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}>
+              <a
+                href="/sales"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  setPage("Sales");
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", color: "#2878e5", textDecoration: "none" }}
+              >
                 View all <ArrowUpRight size={12} />
               </a>
             </div>
