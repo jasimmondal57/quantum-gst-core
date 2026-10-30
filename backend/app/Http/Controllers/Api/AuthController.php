@@ -76,6 +76,8 @@ class AuthController extends Controller
             ]);
         }
 
+        $business->load('gstins');
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -101,8 +103,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $organization = $user->organizations()->with('businesses.gstins')->first();
-        $business = $organization ? $organization->businesses()->first() : null;
+        $organization = $user->organizations()->first();
+        $business = $organization ? $organization->businesses()->with('gstins')->first() : null;
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -118,7 +120,7 @@ class AuthController extends Controller
         $user = $request->user();
         $organizations = $user->organizations()->with('businesses.gstins')->get();
         $primaryOrg = $organizations->first();
-        $primaryBusiness = $primaryOrg ? $primaryOrg->businesses->first() : null;
+        $primaryBusiness = $primaryOrg ? $primaryOrg->businesses()->with('gstins')->first() : null;
 
         return response()->json([
             'user' => $user,

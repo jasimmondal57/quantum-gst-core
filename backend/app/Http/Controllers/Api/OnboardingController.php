@@ -21,14 +21,26 @@ class OnboardingController extends Controller
     /**
      * Check if the instance is already initialized or needs initial setup.
      */
-    public function checkStatus()
+    public function checkStatus(Request $request)
     {
-        $hasOrganization = Organization::exists();
-        $business = Business::with('gstins')->first();
+        $user = $request->user('sanctum') ?? $request->user();
+
+        if ($user) {
+            $organization = $user->organizations()->with('businesses.gstins')->first();
+            $business = $organization ? $organization->businesses->first() : null;
+
+            return response()->json([
+                'is_initialized' => $business !== null,
+                'business' => $business,
+                'organization' => $organization,
+                'user' => $user,
+            ]);
+        }
 
         return response()->json([
-            'is_initialized' => $hasOrganization && $business !== null,
-            'business' => $business,
+            'is_initialized' => false,
+            'business' => null,
+            'organization' => null,
         ]);
     }
 

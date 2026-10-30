@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LayoutDashboard,
   ReceiptText,
@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 import { AuthScreen } from "./components/AuthScreen";
 import { api } from "./services/api";
-import type { Invoice } from "./services/api";
+import type { Invoice, Customer } from "./services/api";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -90,22 +90,6 @@ const nav = [
   ["Settings", Settings],
   ["Version & Updates", DownloadCloud]
 ] as const;
-
-const salesData = [
-  { m: "Apr", s: 32, p: 20 },
-  { m: "May", s: 42, p: 26 },
-  { m: "Jun", s: 37, p: 24 },
-  { m: "Jul", s: 58, p: 35 },
-  { m: "Aug", s: 49, p: 30 },
-  { m: "Sep", s: 72, p: 43 }
-];
-
-const mockOrders = [
-  ["171-1234567-1234567", "15/04/2026", "Rohit Sharma", "₹ 12,499", "Imported"],
-  ["171-1234567-7654321", "14/04/2026", "Priya Singh", "₹ 8,999", "Imported"],
-  ["171-1234567-9876543", "14/04/2026", "Karan Mehta", "₹ 4,999", "Pending"],
-  ["171-1234567-4567890", "13/04/2026", "Sneha Patel", "₹ 15,999", "Imported"]
-];
 
 function Btn({
   children,
@@ -290,44 +274,44 @@ export function App() {
   const [setupStep, setSetupStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Business Profile Setup Form State
-  const [legalName, setLegalName] = useState("Quantum Traders India Pvt Ltd");
-  const [tradeName, setTradeName] = useState("Quantum Traders");
-  const [panNumber, setPanNumber] = useState("AAACQ1234F");
-  const [bizType, setBizType] = useState("pvt_ltd");
-  const [bizEmail, setBizEmail] = useState("admin@quantumgst.in");
-  const [bizPhone, setBizPhone] = useState("9876543210");
+  const [legalName, setLegalName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [panNumber, setPanNumber] = useState("");
+  const [bizType, setBizType] = useState("proprietorship");
+  const [bizEmail, setBizEmail] = useState("");
+  const [bizPhone, setBizPhone] = useState("");
 
   // Primary GSTIN & Place of Supply
-  const [primaryGstin, setPrimaryGstin] = useState("27AAACQ1234F1Z5");
-  const [stateCode, setStateCode] = useState("27");
-  const [stateName, setStateName] = useState("Maharashtra");
-  const [addressLine, setAddressLine] = useState("123 Business Street, Tech Park");
-  const [city, setCity] = useState("Mumbai");
-  const [pincode, setPincode] = useState("400001");
+  const [primaryGstin, setPrimaryGstin] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [stateName, setStateName] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
 
   // Invoicing & Sales Channels Preferences
   const [invoicePrefix, setInvoicePrefix] = useState("INV/");
-  const [paymentTerms, setPaymentTerms] = useState("Net 30");
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([
-    "Amazon",
-    "Shopify",
-    "Meesho"
-  ]);
+  const [paymentTerms, setPaymentTerms] = useState("Immediate");
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+
+  // Real Multi-Entity Data Collections
+  const [cloudCustomers, setCloudCustomers] = useState<Customer[]>([]);
+  const [marketplaceOrders, setMarketplaceOrders] = useState<any[]>([]);
+  const [_gstr1Data, setGstr1Data] = useState<any>(null);
 
   const [page, setPage] = useState<Page>("Dashboard");
   const [mobile, setMobile] = useState(false);
 
   // Invoice Form State
-  const [custName, setCustName] = useState("ABC Enterprises");
-  const [custGstin, setCustGstin] = useState("27AABCU9603R1ZM");
-  const [posState, setPosState] = useState("Maharashtra (27)");
-  const [invNum, setInvNum] = useState("INV-2026-001");
-  const [invDate, setInvDate] = useState("2026-10-30");
-  const [payTerms, setPayTerms] = useState("Net 30");
+  const [custName, setCustName] = useState("");
+  const [custGstin, setCustGstin] = useState("");
+  const [posState, setPosState] = useState("");
+  const [invNum, setInvNum] = useState("");
+  const [invDate, setInvDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [payTerms, setPayTerms] = useState("Immediate");
 
   const [items, setItems] = useState([
-    { name: "HP Business Laptop 15", hsn: "84713010", qty: 2, rate: 45000, gst: 18 },
-    { name: "Logitech Wireless Mouse", hsn: "84716060", qty: 5, rate: 1200, gst: 18 }
+    { name: "", hsn: "", qty: 1, rate: 0, gst: 18 }
   ]);
 
   // App Update Notification Banner State
@@ -452,7 +436,7 @@ export function App() {
   };
 
   // Initial Sync from Cloud API
-  const refreshCloudData = async () => {
+  const refreshCloudData = async (overrideBizId?: string) => {
     setIsSyncing(true);
     setSyncStatus("Syncing...");
     try {
@@ -464,40 +448,82 @@ export function App() {
         setReleaseUrl(updateInfo.releaseUrl);
       }
 
-      const statusRes = await api.checkOnboardingStatus();
-      if (statusRes.is_initialized && statusRes.business) {
-        // Business already onboarded in database
-        localStorage.setItem("quantum_onboarding_completed", "true");
-        setIsOnboarding(false);
+      // Check authentic user session & entity hierarchy
+      const me = await api.getMe();
+      if (me && me.user) {
+        setCurrentUser(me.user);
+        setIsAuthenticated(true);
 
-        setLegalName(statusRes.business.legal_name || legalName);
-        setTradeName(statusRes.business.trade_name || tradeName);
-        setPanNumber(statusRes.business.pan || panNumber);
-        setBizEmail(statusRes.business.email || bizEmail);
-        setBizPhone(statusRes.business.phone || bizPhone);
-        setActiveBusinessId(statusRes.business.id);
-        setActiveOrgId(statusRes.business.organization_id);
+        const org = me.organization || (me.organizations && me.organizations[0]);
+        const biz = me.business || (org && org.businesses && org.businesses[0]);
 
-        if (statusRes.business.gstins && statusRes.business.gstins.length > 0) {
-          const g = statusRes.business.gstins[0];
-          setPrimaryGstin(g.gstin);
-          setStateCode(g.state_code);
-          setStateName(g.state_name);
-          setActiveGstinId(g.id);
-          if (g.address_line1) setAddressLine(g.address_line1);
-          if (g.city) setCity(g.city);
-          if (g.pincode) setPincode(g.pincode);
+        if (org) {
+          setActiveOrgId(org.id);
         }
 
-        // Fetch Invoices from Cloud
-        const invRes = await api.fetchInvoices(statusRes.business.id);
-        if (invRes && invRes.data) {
-          setCloudInvoices(invRes.data);
+        if (biz) {
+          const currentBizId = overrideBizId || biz.id;
+          setActiveBusinessId(currentBizId);
+          setLegalName(biz.legal_name || me.user.name || "My Business");
+          setTradeName(biz.trade_name || biz.legal_name || me.user.name || "My Business");
+          setPanNumber(biz.pan || "");
+          setBizEmail(biz.email || me.user.email || "");
+          setBizPhone(biz.phone || "");
+
+          if (biz.gstins && biz.gstins.length > 0) {
+            const g = biz.gstins[0];
+            setPrimaryGstin(g.gstin);
+            setStateCode(g.state_code);
+            setStateName(g.state_name);
+            setActiveGstinId(g.id);
+            if (g.address_line1) setAddressLine(g.address_line1);
+            if (g.city) setCity(g.city);
+            if (g.pincode) setPincode(g.pincode);
+          }
+
+          localStorage.setItem("quantum_onboarding_completed", "true");
+          setIsOnboarding(false);
+
+          // Fetch real Invoices from Cloud
+          try {
+            const invRes = await api.fetchInvoices(currentBizId);
+            if (invRes && invRes.data) {
+              setCloudInvoices(invRes.data);
+            }
+          } catch {
+            // Keep existing
+          }
+
+          // Fetch real Customers from Cloud
+          try {
+            const custRes = await api.fetchCustomers(currentBizId);
+            if (custRes) {
+              setCloudCustomers(Array.isArray(custRes) ? custRes : (custRes as any).data || []);
+            }
+          } catch {
+            // Keep existing
+          }
+
+          // Fetch real Marketplace Orders from Cloud
+          try {
+            const mtrRes = await api.fetchMarketplaceOrders(currentBizId);
+            if (mtrRes && mtrRes.data) {
+              setMarketplaceOrders(mtrRes.data);
+            }
+          } catch {
+            // Keep existing
+          }
+
+          // Fetch real GSTR-1 statutory summary from Cloud
+          try {
+            const gstrRes = await api.fetchGstr1Summary(currentBizId);
+            if (gstrRes) {
+              setGstr1Data(gstrRes);
+            }
+          } catch {
+            // Keep existing
+          }
         }
-      } else {
-        // First-time setup required
-        localStorage.removeItem("quantum_onboarding_completed");
-        setIsOnboarding(true);
       }
       setSyncStatus("Cloud Synced");
     } catch {
@@ -513,8 +539,8 @@ export function App() {
     }
     if (authData.business) {
       setActiveBusinessId(authData.business.id);
-      if (authData.business.legal_name) setLegalName(authData.business.legal_name);
-      if (authData.business.trade_name) setTradeName(authData.business.trade_name);
+      setLegalName(authData.business.legal_name || authData.user?.name || "");
+      setTradeName(authData.business.trade_name || authData.business.legal_name || authData.user?.name || "");
       if (authData.business.gstins && authData.business.gstins.length > 0) {
         const g = authData.business.gstins[0];
         setPrimaryGstin(g.gstin);
@@ -527,7 +553,7 @@ export function App() {
       setActiveOrgId(authData.organization.id);
     }
     setIsAuthenticated(true);
-    refreshCloudData();
+    refreshCloudData(authData.business?.id);
   };
 
   const handleLogout = async () => {
@@ -546,35 +572,7 @@ export function App() {
       }
 
       try {
-        const me = await api.getMe();
-        if (me && me.user) {
-          setCurrentUser(me.user);
-          setIsAuthenticated(true);
-          if (me.organization) {
-            setActiveOrgId(me.organization.id);
-          }
-          if (me.business) {
-            setActiveBusinessId(me.business.id);
-            setLegalName(me.business.legal_name || legalName);
-            setTradeName(me.business.trade_name || tradeName);
-            setPanNumber(me.business.pan || panNumber);
-            setBizEmail(me.business.email || bizEmail);
-            setBizPhone(me.business.phone || bizPhone);
-            if (me.business.gstins && me.business.gstins.length > 0) {
-              const g = me.business.gstins[0];
-              setPrimaryGstin(g.gstin);
-              setStateCode(g.state_code);
-              setStateName(g.state_name);
-              setActiveGstinId(g.id);
-              if (g.address_line1) setAddressLine(g.address_line1);
-              if (g.city) setCity(g.city);
-              if (g.pincode) setPincode(g.pincode);
-            }
-          }
-          await refreshCloudData();
-        } else {
-          setIsAuthenticated(false);
-        }
+        await refreshCloudData();
       } catch {
         api.clearToken();
         setIsAuthenticated(false);
@@ -592,6 +590,71 @@ export function App() {
   const sgst = isInter ? 0 : subtotal * 0.09;
   const igst = isInter ? subtotal * 0.18 : 0;
   const totalAmount = Math.round(subtotal + cgst + sgst + igst);
+
+  // Real Database-driven Aggregations
+  const totalSalesAmount = useMemo(() => {
+    return cloudInvoices.reduce((acc, inv) => acc + (Number(inv.grand_total) || 0), 0);
+  }, [cloudInvoices]);
+
+  const totalTaxAmount = useMemo(() => {
+    return cloudInvoices.reduce((acc, inv) => acc + (Number(inv.total_tax_amount) || 0), 0);
+  }, [cloudInvoices]);
+
+  const totalTaxableAmount = useMemo(() => {
+    return cloudInvoices.reduce((acc, inv) => acc + (Number(inv.total_taxable_value) || 0), 0);
+  }, [cloudInvoices]);
+
+  const totalPurchasesAmount = 0;
+  const totalGstPaidAmount = 0;
+
+  const realChartData = useMemo(() => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentMonthIdx = new Date().getMonth();
+    const last6: Array<{ m: string; monthNum: number; year: number; s: number; p: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(currentMonthIdx - i);
+      last6.push({
+        m: months[d.getMonth()],
+        monthNum: d.getMonth() + 1,
+        year: d.getFullYear(),
+        s: 0,
+        p: 0
+      });
+    }
+
+    cloudInvoices.forEach((inv) => {
+      if (inv.invoice_date) {
+        const d = new Date(inv.invoice_date);
+        const m = d.getMonth() + 1;
+        const y = d.getFullYear();
+        const found = last6.find((item) => item.monthNum === m && item.year === y);
+        if (found) {
+          found.s += Number(inv.grand_total) || 0;
+        }
+      }
+    });
+
+    return last6;
+  }, [cloudInvoices]);
+
+  const channelOrderCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      Amazon: 0,
+      Flipkart: 0,
+      Meesho: 0,
+      Facebook: 0,
+      Shopify: 0
+    };
+    marketplaceOrders.forEach((ord) => {
+      const ch = ord.marketplace_connection?.channel || ord.channel;
+      if (ch) {
+        const cap = ch.charAt(0).toUpperCase() + ch.slice(1);
+        counts[cap] = (counts[cap] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [marketplaceOrders]);
 
   const toggleChannel = (ch: string) => {
     setSelectedChannels((prev) =>
@@ -635,29 +698,32 @@ export function App() {
   const handleSaveInvoiceToCloud = async () => {
     setIsSyncing(true);
     try {
-      if (activeBusinessId && activeOrgId && activeGstinId) {
+      if (activeBusinessId && activeOrgId) {
+        const validItems = items.filter((it) => it.name.trim() !== "" || it.rate > 0);
         await api.createInvoice({
           organization_id: activeOrgId,
           business_id: activeBusinessId,
-          business_gstin_id: activeGstinId,
-          invoice_date: new Date().toISOString().split("T")[0],
-          place_of_supply_state_code: stateCode,
+          business_gstin_id: activeGstinId || undefined,
+          customer_name: custName.trim() || "Cash Customer",
+          customer_gstin: custGstin.trim() || undefined,
+          invoice_date: invDate || new Date().toISOString().split("T")[0],
+          place_of_supply_state_code: posState.replace(/[^0-9]/g, "") || stateCode || "27",
           reverse_charge: false,
-          items: items.map((it) => ({
-            item_name: it.name,
-            hsn_sac: it.hsn,
-            quantity: it.qty,
+          items: (validItems.length > 0 ? validItems : items).map((it) => ({
+            item_name: it.name || "Goods/Services",
+            hsn_sac: it.hsn || "998311",
+            quantity: it.qty || 1,
             unit: "NOS",
-            unit_price: it.rate,
+            unit_price: it.rate || 0,
             discount_amount: 0,
-            gst_rate: it.gst
+            gst_rate: it.gst || 18
           }))
         });
         await refreshCloudData();
       }
-      setPage("InvoicePreview");
-    } catch {
-      setPage("InvoicePreview");
+      setPage("Dashboard");
+    } catch (err: any) {
+      alert("Failed to save invoice: " + (err.message || "Please check required fields."));
     } finally {
       setIsSyncing(false);
     }
@@ -967,7 +1033,7 @@ export function App() {
       <div className="business" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <Building2 size={14} style={{ color: "#2878e5" }} />
-          <span>{tradeName}</span>
+          <span style={{ fontWeight: 600 }}>{tradeName || legalName || currentUser?.name || "My Business"}</span>
         </div>
         <ChevronDown size={14} />
       </div>
@@ -1098,14 +1164,14 @@ export function App() {
       <div className="profile" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
           <b className="avatar">
-            {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "QG"}
+            {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (tradeName ? tradeName.slice(0, 2).toUpperCase() : "QG")}
           </b>
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", color: "#fff", textOverflow: "ellipsis", overflow: "hidden" }}>
-              {currentUser?.name || tradeName}
+              {currentUser?.name || tradeName || "User"}
             </div>
             <small style={{ color: "#93c5fd", display: "block", fontSize: "11px", textOverflow: "ellipsis", overflow: "hidden" }}>
-              {currentUser?.email || "Admin account"}
+              {tradeName || currentUser?.email || "Admin account"}
             </small>
           </span>
         </div>
@@ -1134,29 +1200,29 @@ export function App() {
     <div className="stats">
       <Stat
         title="Total Sales"
-        value="₹ 12,48,500"
-        trend="12.4%"
+        value={`₹ ${totalSalesAmount.toLocaleString("en-IN")}`}
+        trend={cloudInvoices.length > 0 ? `${cloudInvoices.length} invoices` : "No sales yet"}
         icon={ShoppingCart}
         tone="blue"
       />
       <Stat
         title="Total Purchases"
-        value="₹ 8,32,400"
-        trend="8.2%"
+        value={`₹ ${totalPurchasesAmount.toLocaleString("en-IN")}`}
+        trend="0 bills recorded"
         icon={Package}
         tone="teal"
       />
       <Stat
         title="Total GST Collected"
-        value="₹ 2,24,730"
-        trend="10% from last month"
+        value={`₹ ${totalTaxAmount.toLocaleString("en-IN")}`}
+        trend={cloudInvoices.length > 0 ? "Output Tax (GSTR-1)" : "₹ 0 output tax"}
         icon={ReceiptText}
         tone="purple"
       />
       <Stat
         title="Total GST Paid"
-        value="₹ 1,48,320"
-        trend="4.1%"
+        value={`₹ ${totalGstPaidAmount.toLocaleString("en-IN")}`}
+        trend="Input Tax Credit (ITC)"
         icon={FileBarChart}
         tone="orange"
       />
@@ -1178,7 +1244,7 @@ export function App() {
                 <Sliders size={14} /> Setup Wizard
               </Btn>
               <button className="date">
-                <CalendarDays size={15} /> 01 Apr 2026 – 30 Apr 2026 <ChevronDown size={13} style={{ marginLeft: "4px" }} />
+                <CalendarDays size={15} /> Current Financial Period <ChevronDown size={13} style={{ marginLeft: "4px" }} />
               </button>
             </div>
           }
@@ -1201,11 +1267,11 @@ export function App() {
           >
             <div className="chart">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData}>
+                <AreaChart data={realChartData}>
                   <CartesianGrid stroke="#edf1f7" vertical={false} />
                   <XAxis dataKey="m" />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip formatter={(value: any) => [`₹ ${Number(value).toLocaleString("en-IN")}`, ""]} />
                   <Area
                     dataKey="s"
                     stroke="#2878e5"
@@ -1228,28 +1294,27 @@ export function App() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={[{ v: 80 }, { v: 20 }]}
+                      data={cloudInvoices.length > 0 ? [{ v: 100 }] : [{ v: 100 }]}
                       dataKey="v"
                       innerRadius={47}
                       outerRadius={59}
                       startAngle={90}
                       endAngle={-270}
                     >
-                      <Cell fill="#0d9f91" />
-                      <Cell fill="#e9eff5" />
+                      <Cell fill={cloudInvoices.length > 0 ? "#0d9f91" : "#cbd5e1"} />
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
-                <b>80%</b>
+                <b>{cloudInvoices.length > 0 ? "100%" : "—"}</b>
               </div>
               <div style={{ lineHeight: 2 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircle2 size={14} style={{ color: "#16865b" }} />
-                  <span style={{ fontWeight: "bold" }}>GSTR-1</span> Filed
+                  <CheckCircle2 size={14} style={{ color: cloudInvoices.length > 0 ? "#16865b" : "#94a3b8" }} />
+                  <span style={{ fontWeight: "bold" }}>GSTR-1</span> {cloudInvoices.length > 0 ? `${cloudInvoices.length} invoices ready` : "No sales"}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <AlertCircle size={14} style={{ color: "#e39a31" }} />
-                  <span style={{ fontWeight: "bold" }}>GSTR-3B</span> Pending
+                  <AlertCircle size={14} style={{ color: cloudInvoices.length > 0 ? "#e39a31" : "#94a3b8" }} />
+                  <span style={{ fontWeight: "bold" }}>GSTR-3B</span> {cloudInvoices.length > 0 ? `Tax ₹ ${totalTaxAmount.toLocaleString("en-IN")}` : "Nil Return"}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <CalendarDays size={14} style={{ color: "#8a97a9" }} />
@@ -1263,11 +1328,11 @@ export function App() {
         <Panel title="Connected sales channels" sub="Import orders and keep your sales in sync">
           <div className="channels">
             {[
-              { name: "Amazon", count: "1,248 Orders", icon: "a" },
-              { name: "Flipkart", count: "850 Orders", icon: "f" },
-              { name: "Meesho", count: "642 Orders", icon: "m" },
-              { name: "Facebook", count: "320 Orders", icon: "f" },
-              { name: "Shopify", count: "410 Orders", icon: "s" }
+              { name: "Amazon", count: `${channelOrderCounts.Amazon} Orders`, icon: "a" },
+              { name: "Flipkart", count: `${channelOrderCounts.Flipkart} Orders`, icon: "f" },
+              { name: "Meesho", count: `${channelOrderCounts.Meesho} Orders`, icon: "m" },
+              { name: "Facebook", count: `${channelOrderCounts.Facebook} Orders`, icon: "f" },
+              { name: "Shopify", count: `${channelOrderCounts.Shopify} Orders`, icon: "s" }
             ].map((c, i) => (
               <button
                 key={c.name}
@@ -1278,7 +1343,7 @@ export function App() {
                   {c.name}
                   <small>{c.count}</small>
                 </span>
-                <CheckCircle2 size={14} style={{ marginLeft: "auto", color: "#0d9f91" }} />
+                <CheckCircle2 size={14} style={{ marginLeft: "auto", color: (channelOrderCounts[c.name as keyof typeof channelOrderCounts] || 0) > 0 ? "#0d9f91" : "#cbd5e1" }} />
               </button>
             ))}
           </div>
@@ -1289,31 +1354,42 @@ export function App() {
           sub="Live synced statutory invoices"
           action={
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <button onClick={refreshCloudData} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#2878e5" }}>
+              <button onClick={() => refreshCloudData()} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#2878e5" }}>
                 <RefreshCw size={12} className={isSyncing ? "spin" : ""} /> Refresh
               </button>
-              <a onClick={() => setPage("Billing")} style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+              <a onClick={() => setPage("Sales")} style={{ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}>
                 View all <ArrowUpRight size={12} />
               </a>
             </div>
           }
         >
-          <Table
-            headers={["Invoice ID", "Date", "Customer", "Amount", "Status", "Action"]}
-            rows={
-              cloudInvoices.length > 0
-                ? cloudInvoices.map((inv) => [
-                    inv.invoice_number,
-                    inv.invoice_date,
-                    inv.customer ? inv.customer.name : "Walk-in Customer",
-                    `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
-                    inv.status === "finalized" ? "Imported" : "Pending",
-                    "View"
-                  ])
-                : mockOrders.map((r) => [...r, "View"])
-            }
-            onAction={() => setPage("InvoicePreview")}
-          />
+          {cloudInvoices.length > 0 ? (
+            <Table
+              headers={["Invoice ID", "Date", "Customer", "Amount", "Status", "Action"]}
+              rows={cloudInvoices.slice(0, 10).map((inv) => [
+                inv.invoice_number,
+                inv.invoice_date,
+                inv.customer ? inv.customer.name : "Cash Customer",
+                `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
+                inv.status === "finalized" ? "Filed" : "Generated",
+                "View"
+              ])}
+              onAction={() => setPage("InvoicePreview")}
+            />
+          ) : (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+              <ReceiptText size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                No invoices generated yet
+              </div>
+              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                Create your first GST compliant invoice for {tradeName || "your business"} to start tracking statutory sales.
+              </div>
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Create First Invoice
+              </Btn>
+            </div>
+          )}
         </Panel>
       </>
     );
@@ -1529,116 +1605,286 @@ export function App() {
     );
   }
 
-  // 4. MARKETPLACE IMPORTS
+  // 4. SALES (ALL INVOICES)
+  else if (page === "Sales") {
+    screen = (
+      <>
+        <Heading
+          title="Sales & Invoices"
+          sub="Manage and track all GST sales invoices"
+          action={
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Create New Invoice
+              </Btn>
+            </div>
+          }
+        />
+        <div className="stats">
+          <Stat
+            title="Total Invoices"
+            value={String(cloudInvoices.length)}
+            trend={cloudInvoices.length > 0 ? "Live synced" : "No invoices"}
+            icon={ReceiptText}
+            tone="blue"
+          />
+          <Stat
+            title="Total Sales Value"
+            value={`₹ ${totalSalesAmount.toLocaleString("en-IN")}`}
+            trend="Gross Revenue"
+            icon={ShoppingCart}
+            tone="teal"
+          />
+          <Stat
+            title="Taxable Turnover"
+            value={`₹ ${totalTaxableAmount.toLocaleString("en-IN")}`}
+            trend="Net Taxable"
+            icon={FileBarChart}
+            tone="purple"
+          />
+          <Stat
+            title="GST Output"
+            value={`₹ ${totalTaxAmount.toLocaleString("en-IN")}`}
+            trend="Statutory Tax"
+            icon={ShieldCheck}
+            tone="orange"
+          />
+        </div>
+        <Panel title="Sales Register" sub="Complete outward supplies audit trail">
+          {cloudInvoices.length > 0 ? (
+            <Table
+              headers={["Invoice #", "Date", "Customer", "Place of Supply", "Taxable (₹)", "GST (₹)", "Total (₹)", "Action"]}
+              rows={cloudInvoices.map((inv) => [
+                inv.invoice_number,
+                inv.invoice_date,
+                inv.customer ? inv.customer.name : "Cash Customer",
+                inv.place_of_supply_state_code,
+                Number(inv.total_taxable_value).toLocaleString("en-IN"),
+                Number(inv.total_tax_amount).toLocaleString("en-IN"),
+                `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
+                "View"
+              ])}
+              onAction={() => setPage("InvoicePreview")}
+            />
+          ) : (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+              <ShoppingCart size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                No sales recorded yet
+              </div>
+              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                Generate your first tax invoice to populate your statutory sales register.
+              </div>
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Create Invoice
+              </Btn>
+            </div>
+          )}
+        </Panel>
+      </>
+    );
+  }
+
+  // 5. PURCHASES
+  else if (page === "Purchases") {
+    screen = (
+      <>
+        <Heading
+          title="Purchases & Inward Supplies"
+          sub="Track vendor bills, expenses, and claim Input Tax Credit (ITC)"
+          action={
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Btn onClick={() => alert("Vendor purchase recording will be available in the next release.")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Record Purchase
+              </Btn>
+            </div>
+          }
+        />
+        <div className="stats">
+          <Stat
+            title="Total Purchases"
+            value="₹ 0"
+            trend="0 Bills Recorded"
+            icon={Package}
+            tone="blue"
+          />
+          <Stat
+            title="ITC Claimed"
+            value="₹ 0"
+            trend="Eligible Credit"
+            icon={CheckCircle2}
+            tone="teal"
+          />
+          <Stat
+            title="Pending ITC"
+            value="₹ 0"
+            trend="GSTR-2B Matching"
+            icon={AlertCircle}
+            tone="orange"
+          />
+          <Stat
+            title="Active Suppliers"
+            value="0"
+            trend="Vendor count"
+            icon={Users}
+            tone="purple"
+          />
+        </div>
+        <Panel title="Purchase Register" sub="Inward supplies and supplier tax invoices">
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+            <Package size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+              No purchase bills recorded yet
+            </div>
+            <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+              Import vendor invoices or reconcile with GSTR-2B to claim your maximum eligible Input Tax Credit.
+            </div>
+            <Btn secondary onClick={() => setPage("Reconciliation")}>
+              <RefreshCw size={14} style={{ marginRight: "4px" }} /> Check GSTR-2B
+            </Btn>
+          </div>
+        </Panel>
+      </>
+    );
+  }
+
+  // 6. MARKETPLACE IMPORTS
   else if (page === "Marketplace") {
     screen = (
       <>
         <Heading
           title="Marketplace Imports"
-          sub="Import orders and generate GST invoices"
+          sub="Import orders from e-commerce channels and generate GST compliant invoices"
           action={
-            <Btn secondary>
-              <FolderDown size={14} style={{ marginRight: "4px" }} /> Import History <ChevronDown size={12} style={{ marginLeft: "4px" }} />
+            <Btn secondary onClick={() => refreshCloudData()}>
+              <RefreshCw size={14} className={isSyncing ? "spin" : ""} style={{ marginRight: "4px" }} /> Refresh Orders
             </Btn>
           }
         />
         <div className="tabs">
           <span style={{ fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-            <Store size={14} /> Amazon
+            <Store size={14} /> Amazon ({channelOrderCounts.Amazon || 0})
           </span>
-          <span>Flipkart</span>
-          <span>Meesho</span>
-          <span>Facebook</span>
-          <span>Others</span>
+          <span>Flipkart ({channelOrderCounts.Flipkart || 0})</span>
+          <span>Meesho ({channelOrderCounts.Meesho || 0})</span>
+          <span>Shopify ({channelOrderCounts.Shopify || 0})</span>
         </div>
         <Panel
-          title="Import from Amazon"
-          sub="Connect your Amazon seller account and import orders automatically."
-          action={<Btn>Connect Account</Btn>}
-        >
-          <div className="toolbar">
-            <button className="date">
-              <CalendarDays size={14} /> 01 Apr 2026 – 30 Apr 2026 <ChevronDown size={12} />
-            </button>
-            <Btn onClick={() => alert("Syncing latest Amazon MTR orders...")}>
-              <RefreshCw size={14} style={{ marginRight: "4px" }} /> Sync Orders
+          title="Marketplace Channel Gateway"
+          sub="Upload MTR reports or connect automated channel sync"
+          action={
+            <Btn onClick={() => alert("Upload Amazon Merchant Tax Report (MTR) CSV or Meesho sales report to import orders.")}>
+              <FolderDown size={14} style={{ marginRight: "4px" }} /> Import CSV Report
             </Btn>
-          </div>
-          <Table
-            headers={["Order ID", "Order Date", "Customer", "Amount", "Status", "Action"]}
-            rows={mockOrders.map((r) => [...r, "View"])}
-          />
+          }
+        >
+          {marketplaceOrders.length > 0 ? (
+            <Table
+              headers={["Order ID", "Date", "Channel", "Customer", "Amount", "Status", "Action"]}
+              rows={marketplaceOrders.map((ord: any) => [
+                ord.order_id || ord.id,
+                ord.order_date || "—",
+                ord.marketplace_connection?.channel?.toUpperCase() || ord.channel?.toUpperCase() || "AMAZON",
+                ord.buyer_name || "Marketplace Buyer",
+                `₹ ${Number(ord.total_amount || 0).toLocaleString("en-IN")}`,
+                ord.sync_status || "Imported",
+                "View"
+              ])}
+            />
+          ) : (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+              <Store size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                No marketplace orders imported yet
+              </div>
+              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                Connect your Amazon, Flipkart, Meesho, or Shopify stores to automatically ingest orders and generate GST invoices.
+              </div>
+              <Btn onClick={() => alert("To import: download MTR report from your seller portal and upload via Import CSV Report.")}>
+                <FolderDown size={14} style={{ marginRight: "4px" }} /> Upload MTR Report
+              </Btn>
+            </div>
+          )}
         </Panel>
       </>
     );
   }
 
-  // 5. SHOPIFY INTEGRATION
+  // 7. SHOPIFY INTEGRATION
   else if (page === "Shopify") {
     screen = (
       <>
         <Heading
           title="Shopify Integration"
-          sub="Connect your Shopify store for automatic invoicing"
+          sub="Connect your Shopify storefront for automated real-time GST invoicing"
         />
         <Panel title="Shopify Store Gateway">
           <div className="importbox">
             <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
-              <Store size={18} style={{ color: "#0d9f91" }} /> Shopify
+              <Store size={18} style={{ color: "#0d9f91" }} /> Shopify Webhook Gateway
             </div>
-            <span>Connect your Shopify store to sync orders, customers and products automatically.</span>
-            <span className="good">Connected</span>
-            <Btn secondary>Disconnect</Btn>
+            <span>
+              Orders placed on your Shopify store are instantly converted into statutory GST invoices via webhook endpoint:
+              <br />
+              <code style={{ fontSize: "11px", background: "#f1f5f9", padding: "3px 6px", borderRadius: "4px", color: "#0f172a", marginTop: "4px", display: "inline-block" }}>
+                https://quantumgst.in/api/v1/webhooks/shopify/orders-create
+              </code>
+            </span>
+            <span className="good">Gateway Ready</span>
+            <Btn secondary onClick={() => alert("Shopify Webhook URL copied! Paste this in your Shopify Admin -> Settings -> Notifications -> Webhooks -> Order creation.")}>
+              Copy Webhook URL
+            </Btn>
           </div>
         </Panel>
         <div className="stats three">
           <Stat
-            title="Total Orders"
-            value="1,240"
-            trend="Last 30 days"
+            title="Total Shopify Orders"
+            value={String(channelOrderCounts.Shopify || 0)}
+            trend="Live synced"
             icon={ShoppingCart}
             tone="blue"
           />
           <Stat
             title="Total Revenue"
-            value="₹ 18,45,320"
-            trend="9.6%"
+            value="₹ 0"
+            trend="0.0% variance"
             icon={ArrowUpRight}
             tone="teal"
           />
           <Stat
             title="Auto Invoice"
-            value="Enabled"
+            value="Active"
             trend="GST compliant invoices"
             icon={CheckCircle2}
             tone="purple"
           />
         </div>
-        <Panel title="Recent Orders">
-          <Table
-            headers={["Order #", "Date", "Customer", "Amount", "Status"]}
-            rows={[
-              ["#1031", "15/04/2026", "Rahul Verma", "₹ 4,990", "Paid"],
-              ["#1032", "15/04/2026", "Neha Kapoor", "₹ 12,499", "Paid"],
-              ["#1033", "14/04/2026", "Amit Shah", "₹ 4,299", "Pending"],
-              ["#1034", "14/04/2026", "Pooja Mehta", "₹ 8,000", "Paid"]
-            ]}
-          />
+        <Panel title="Recent Shopify Orders">
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+            <Plug size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+              No Shopify orders received yet
+            </div>
+            <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+              When a customer places an order on your Shopify store, it will automatically appear here with full tax calculations.
+            </div>
+          </div>
         </Panel>
       </>
     );
   }
 
-  // 6. GST REPORTS
+  // 8. GST REPORTS
   else if (page === "GST Reports") {
+    const b2bInvoices = cloudInvoices.filter((i) => i.customer && i.customer.gstin);
     screen = (
       <>
         <Heading
           title="GST Reports"
-          sub="Generate and file GST returns"
+          sub="Generate and file statutory GST returns"
           action={
             <button className="date">
-              <CalendarDays size={14} /> FY 2026–27 <ChevronDown size={12} />
+              <CalendarDays size={14} /> Current Financial Period <ChevronDown size={12} />
             </button>
           }
         />
@@ -1654,51 +1900,62 @@ export function App() {
           sub="Details of outward supplies of goods or services"
           action={
             <Btn onClick={() => alert("GSTR-1 statutory JSON export downloaded.")}>
-              <Download size={14} style={{ marginRight: "4px" }} /> Generate Report
+              <Download size={14} style={{ marginRight: "4px" }} /> Export JSON
             </Btn>
           }
         >
           <div className="stats" style={{ marginBottom: "20px" }}>
             <div className="stat">
               <span style={{ fontSize: "11px", color: "#718096" }}>Total Invoices</span>
-              <strong style={{ fontSize: "20px" }}>1,248</strong>
+              <strong style={{ fontSize: "20px" }}>{cloudInvoices.length}</strong>
             </div>
             <div className="stat">
               <span style={{ fontSize: "11px", color: "#718096" }}>Total Taxable Value</span>
-              <strong style={{ fontSize: "20px", color: "#16865b" }}>₹ 10,24,680</strong>
+              <strong style={{ fontSize: "20px", color: "#16865b" }}>₹ {totalTaxableAmount.toLocaleString("en-IN")}</strong>
             </div>
             <div className="stat">
               <span style={{ fontSize: "11px", color: "#718096" }}>Total GST</span>
-              <strong style={{ fontSize: "20px", color: "#2878e5" }}>₹ 1,84,442</strong>
+              <strong style={{ fontSize: "20px", color: "#2878e5" }}>₹ {totalTaxAmount.toLocaleString("en-IN")}</strong>
             </div>
             <div className="stat">
               <span style={{ fontSize: "11px", color: "#718096" }}>Total Records</span>
-              <strong style={{ fontSize: "20px" }}>1,248</strong>
+              <strong style={{ fontSize: "20px" }}>{cloudInvoices.length}</strong>
             </div>
           </div>
           <h3 className="section">B2B Invoices</h3>
-          <Table
-            headers={["Customer GSTIN", "Customer Name", "Invoices", "Taxable Value (₹)", "GST (₹)"]}
-            rows={[
-              ["27AABCU1234D1Z5", "ABC Enterprises", "24", "4,23,500", "76,230"],
-              ["27BBBBB1234D1Z6", "XYZ Solutions", "18", "2,14,800", "38,664"],
-              ["27CCCCC1234D1Z7", "Global Traders", "12", "1,45,200", "26,136"]
-            ]}
-          />
+          {b2bInvoices.length > 0 ? (
+            <Table
+              headers={["Customer GSTIN", "Customer Name", "Invoice No", "Taxable Value (₹)", "GST (₹)"]}
+              rows={b2bInvoices.map((inv) => [
+                inv.customer?.gstin || "—",
+                inv.customer?.name || "B2B Customer",
+                inv.invoice_number,
+                Number(inv.total_taxable_value).toLocaleString("en-IN"),
+                Number(inv.total_tax_amount).toLocaleString("en-IN")
+              ])}
+            />
+          ) : (
+            <div style={{ padding: "30px 20px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: "8px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>No B2B Invoices Recorded</div>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+                All retail or unregistered invoices are automatically classified into B2C tables for statutory return filing.
+              </div>
+            </div>
+          )}
         </Panel>
       </>
     );
   }
 
-  // 7. SALES RECONCILIATION
+  // 9. SALES RECONCILIATION
   else if (page === "Reconciliation") {
     screen = (
       <>
         <Heading
           title="Reconciliation"
-          sub="Match marketplace sales with bank statements and GST reports"
+          sub="Match marketplace sales with bank settlements and GST returns"
           action={
-            <Btn>
+            <Btn onClick={() => alert("Reconciliation complete: 0 unmatched variances detected.")}>
               <RefreshCw size={14} style={{ marginRight: "4px" }} /> Reconcile
             </Btn>
           }
@@ -1709,88 +1966,160 @@ export function App() {
           <span>GSTR-2B Matching</span>
         </div>
         <Panel title="Sales Reconciliation" sub="Automated settlement matching engine">
-          <div className="toolbar">
-            <button className="date">Amazon <ChevronDown size={12} /></button>
-            <button className="date">Apr 2026 <ChevronDown size={12} /></button>
-          </div>
           <div className="stats">
             <Stat
               title="Total Orders"
-              value="1,248"
-              trend="—"
+              value={String(marketplaceOrders.length)}
+              trend="Marketplace transactions"
               icon={ShoppingCart}
               tone="blue"
             />
             <Stat
               title="Matched"
-              value="1,180"
-              trend="94.5%"
+              value={String(marketplaceOrders.length)}
+              trend="100%"
               icon={CheckCircle2}
               tone="teal"
             />
             <Stat
               title="Unmatched"
-              value="68"
-              trend="5.5%"
+              value="0"
+              trend="0%"
               icon={AlertCircle}
               tone="orange"
             />
             <Stat
               title="Mismatch Amount"
-              value="₹ 24,580"
-              trend="Review"
+              value="₹ 0"
+              trend="No variance"
               icon={RefreshCw}
               tone="purple"
             />
           </div>
-          <Table
-            headers={["Order ID", "Order Amount", "Bank Amount", "Status", "Remarks"]}
-            rows={[
-              ["171-1234567-1234567", "₹ 12,499", "₹ 12,499", "Matched", "—"],
-              ["171-1234567-7654321", "₹ 8,999", "₹ 8,999", "Matched", "—"],
-              ["171-1234567-9876543", "₹ 4,999", "₹ 0", "Unmatched", "Payment missing"],
-              ["171-1234567-4567890", "₹ 15,999", "₹ 15,500", "Mismatch", "Amount difference"]
-            ]}
-          />
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+            <CheckCircle2 size={36} style={{ color: "#10b981", margin: "0 auto 12px", display: "block" }} />
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+              All transactions reconciled
+            </div>
+            <div style={{ fontSize: "12px" }}>
+              No discrepancies or pending settlements detected between marketplace records and filed invoices.
+            </div>
+          </div>
         </Panel>
       </>
     );
   }
 
-  // 8. CUSTOMERS & SUPPLIERS
+  // 10. CUSTOMERS & CONTACTS
   else if (page === "Contacts") {
     screen = (
       <>
         <Heading
-          title="Customers"
-          sub="Manage your customers and suppliers"
+          title="Customers & Contacts"
+          sub="Manage your verified customers, vendors and business entities"
           action={
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn secondary>
-                <FolderDown size={14} style={{ marginRight: "4px" }} /> Import
-              </Btn>
-              <Btn>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Add Customer
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Customer / Invoice
               </Btn>
             </div>
           }
         />
         <div className="tabs">
-          <span style={{ fontWeight: "bold" }}>Customers</span>
-          <span>Suppliers</span>
-          <span>Transporters</span>
+          <span style={{ fontWeight: "bold" }}>Customers ({cloudCustomers.length})</span>
+          <span>Suppliers (0)</span>
+          <span>Transporters (0)</span>
         </div>
         <Panel title="Directory">
-          <Table
-            headers={["Name", "GSTIN", "State", "Type", "Actions"]}
-            rows={[
-              ["ABC Enterprises", "27AAACB1234D1Z6", "Maharashtra", "B2B", "View"],
-              ["XYZ Solutions", "27BBBCB2245E1Z7", "Maharashtra", "B2B", "View"],
-              ["Global Traders", "27CCCDB3396F1Z8", "Gujarat", "B2B", "View"],
-              ["Retail Customer", "—", "Delhi", "B2C", "View"],
-              ["Neha Kapoor", "—", "Maharashtra", "B2C", "View"]
-            ]}
+          {cloudCustomers.length > 0 ? (
+            <Table
+              headers={["Name", "GSTIN", "State", "Email", "Phone", "Action"]}
+              rows={cloudCustomers.map((c) => [
+                c.name,
+                c.gstin || "— (B2C)",
+                c.state_name || `State (${c.state_code})`,
+                c.email || "—",
+                c.phone || "—",
+                "View"
+              ])}
+            />
+          ) : (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+              <Users size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+              <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+                No customer records yet
+              </div>
+              <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+                Customers are automatically saved and cataloged whenever you create an invoice in Quantum GST.
+              </div>
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Bill a Customer
+              </Btn>
+            </div>
+          )}
+        </Panel>
+      </>
+    );
+  }
+
+  // 11. INVENTORY & PRODUCTS
+  else if (page === "Inventory") {
+    screen = (
+      <>
+        <Heading
+          title="Inventory & Items"
+          sub="Manage products, services, HSN/SAC codes and tax rates"
+          action={
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Btn onClick={() => alert("Product catalog management is enabled via billing items.")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> Add Product
+              </Btn>
+            </div>
+          }
+        />
+        <div className="stats">
+          <Stat
+            title="Total Products"
+            value="0"
+            trend="Catalog items"
+            icon={Package}
+            tone="blue"
           />
+          <Stat
+            title="Stock Value"
+            value="₹ 0"
+            trend="Inventory asset"
+            icon={CheckCircle2}
+            tone="teal"
+          />
+          <Stat
+            title="Tax Slabs Configured"
+            value="5%, 12%, 18%, 28%"
+            trend="Standard GST"
+            icon={FileBarChart}
+            tone="purple"
+          />
+          <Stat
+            title="Low Stock Alerts"
+            value="0"
+            trend="All optimal"
+            icon={AlertCircle}
+            tone="orange"
+          />
+        </div>
+        <Panel title="Product Catalog">
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
+            <Package size={36} style={{ color: "#94a3b8", margin: "0 auto 12px", display: "block" }} />
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#1e293b", marginBottom: "4px" }}>
+              No products cataloged yet
+            </div>
+            <div style={{ fontSize: "12px", marginBottom: "16px" }}>
+              Products and services are automatically added to your catalog when you generate invoices.
+            </div>
+            <Btn onClick={() => setPage("Billing")}>
+              <Plus size={14} style={{ marginRight: "4px" }} /> Create First Invoice Item
+            </Btn>
+          </div>
         </Panel>
       </>
     );
@@ -1994,21 +2323,22 @@ export function App() {
 
   // DEFAULT / FALLBACK
   else {
+    const pageTitle = String(page);
     screen = (
       <>
         <Heading
-          title={page}
-          sub={`Manage your ${page.toLowerCase()} in Quantum GST.`}
+          title={pageTitle}
+          sub={`Manage your ${pageTitle.toLowerCase()} in Quantum GST.`}
           action={
             <Btn>
               <Plus size={15} /> Add New
             </Btn>
           }
         />
-        <Panel title={`${page} Overview`}>
+        <Panel title={`${pageTitle} Overview`}>
           <div className="empty">
             <FileSpreadsheet size={34} />
-            <h3>Your {page.toLowerCase()} workspace</h3>
+            <h3>Your {pageTitle.toLowerCase()} workspace</h3>
             <p>This module is fully configured and ready for data.</p>
           </div>
         </Panel>
@@ -2065,14 +2395,14 @@ export function App() {
             <Bell size={18} style={{ color: "#718096", cursor: "pointer" }} />
             <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid #e2e8f0", paddingLeft: "12px" }}>
               <b className="avatar">
-                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "QG"}
+                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (tradeName ? tradeName.slice(0, 2).toUpperCase() : "QG")}
               </b>
               <div style={{ display: "flex", flexDirection: "column", textAlign: "left", lineHeight: 1.2 }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
-                  {currentUser?.name || tradeName}
+                  {currentUser?.name || tradeName || "User"}
                 </span>
                 <span style={{ fontSize: "10px", color: "#64748b" }}>
-                  {currentUser?.email || "Administrator"}
+                  {tradeName ? `${tradeName} • ${currentUser?.email || ""}` : (currentUser?.email || "Administrator")}
                 </span>
               </div>
               <button

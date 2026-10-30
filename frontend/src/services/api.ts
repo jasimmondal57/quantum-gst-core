@@ -256,8 +256,17 @@ class QuantumApiClient {
     return res.json();
   }
 
-  async fetchGstr1Summary() {
-    const res = await fetch(`${API_BASE}/reports/gstr1`, {
+  async fetchGstr1Summary(businessId?: string) {
+    const url = businessId ? `${API_BASE}/reports/gstr1?business_id=${businessId}` : `${API_BASE}/reports/gstr1`;
+    const res = await fetch(url, {
+      headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
+  async fetchMarketplaceOrders(businessId?: string) {
+    const url = businessId ? `${API_BASE}/marketplace/orders?business_id=${businessId}` : `${API_BASE}/marketplace/orders`;
+    const res = await fetch(url, {
       headers: this.getHeaders()
     });
     return res.json();
