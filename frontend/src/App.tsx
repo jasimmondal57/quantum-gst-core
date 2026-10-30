@@ -38,7 +38,8 @@ import {
   Sparkles,
   Layers,
   Cloud,
-  CheckCheck
+  CheckCheck,
+  DownloadCloud
 } from "lucide-react";
 import { api } from "./services/api";
 import type { Invoice } from "./services/api";
@@ -263,8 +264,10 @@ export function App() {
   const [activeOrgId, setActiveOrgId] = useState<string>("");
   const [activeGstinId, setActiveGstinId] = useState<string>("");
 
-  // Onboarding Wizard State
-  const [isOnboarding, setIsOnboarding] = useState(false);
+  // Onboarding Wizard State (Only opens if not previously completed or explicitly launched)
+  const [isOnboarding, setIsOnboarding] = useState<boolean>(() => {
+    return localStorage.getItem("quantum_onboarding_completed") !== "true";
+  });
   const [setupStep, setSetupStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Business Profile Setup Form State
@@ -308,13 +311,32 @@ export function App() {
     { name: "Logitech Wireless Mouse", hsn: "84716060", qty: 5, rate: 1200, gst: 18 }
   ]);
 
+  // App Update Notification Banner State
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [latestVersion, setLatestVersion] = useState("1.0.1");
+  const [currentVersion] = useState("1.0.0");
+  const [releaseUrl, setReleaseUrl] = useState("https://github.com/jasimmondal57/quantum-gst-core/releases");
+  const [dismissUpdate, setDismissUpdate] = useState(false);
+
   // Initial Sync from Cloud API
   const refreshCloudData = async () => {
     setIsSyncing(true);
     setSyncStatus("Syncing...");
     try {
+      // Check for available updates
+      const updateInfo = await api.checkLatestAppVersion();
+      if (updateInfo.hasUpdate) {
+        setHasUpdate(true);
+        setLatestVersion(updateInfo.latestVersion);
+        setReleaseUrl(updateInfo.releaseUrl);
+      }
+
       const statusRes = await api.checkOnboardingStatus();
-      if (statusRes.business) {
+      if (statusRes.is_initialized && statusRes.business) {
+        // Business already onboarded in database
+        localStorage.setItem("quantum_onboarding_completed", "true");
+        setIsOnboarding(false);
+
         setLegalName(statusRes.business.legal_name || legalName);
         setTradeName(statusRes.business.trade_name || tradeName);
         setPanNumber(statusRes.business.pan || panNumber);
@@ -340,6 +362,8 @@ export function App() {
           setCloudInvoices(invRes.data);
         }
       } else {
+        // First-time setup required
+        localStorage.removeItem("quantum_onboarding_completed");
         setIsOnboarding(true);
       }
       setSyncStatus("Cloud Synced");
@@ -387,10 +411,12 @@ export function App() {
         default_payment_terms: paymentTerms,
         enabled_channels: selectedChannels
       });
+      localStorage.setItem("quantum_onboarding_completed", "true");
       await refreshCloudData();
       setIsOnboarding(false);
       setPage("Dashboard");
     } catch {
+      localStorage.setItem("quantum_onboarding_completed", "true");
       setIsOnboarding(false);
       setPage("Dashboard");
     } finally {
@@ -436,7 +462,30 @@ export function App() {
         <div style={{ maxWidth: "760px", width: "100%", background: "white", borderRadius: "16px", border: "1px solid #e8edf4", boxShadow: "0 10px 30px rgba(18,59,115,0.08)", overflow: "hidden" }}>
           
           {/* Header banner */}
-          <div style={{ background: "linear-gradient(135deg, #123b73, #2878e5)", padding: "28px 32px", color: "white" }}>
+          <div style={{ background: "linear-gradient(135deg, #123b73, #2878e5)", padding: "28px 32px", color: "white", position: "relative" }}>
+            <button
+              onClick={() => {
+                localStorage.setItem("quantum_onboarding_completed", "true");
+                setIsOnboarding(false);
+              }}
+              style={{
+                position: "absolute",
+                top: "20px",
+                right: "20px",
+                background: "rgba(255,255,255,0.15)",
+                border: "none",
+                borderRadius: "50%",
+                width: "32px",
+                height: "32px",
+                color: "white",
+                cursor: "pointer",
+                display: "grid",
+                placeItems: "center"
+              }}
+              title="Close Wizard"
+            >
+              <X size={16} />
+            </button>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <b style={{ background: "white", color: "#2878e5", borderRadius: "8px", padding: "5px 9px", fontSize: "14px" }}>Q</b>
               <span style={{ fontSize: "18px", fontWeight: "bold" }}>Quantum GST Onboarding</span>
@@ -1512,6 +1561,79 @@ export function App() {
             </span>
           </div>
         </header>
+
+        {/* ================= UPDATE AVAILABLE NOTIFICATION BANNER ================= */}
+        {hasUpdate && !dismissUpdate && (
+          <div
+            style={{
+              background: "linear-gradient(90deg, #123b73, #1d5fbf)",
+              color: "white",
+              padding: "12px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "13px",
+              boxShadow: "0 2px 8px rgba(18,59,115,0.15)",
+              borderBottom: "1px solid rgba(255,255,255,0.15)"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span
+                style={{
+                  background: "#0d9f91",
+                  color: "white",
+                  fontSize: "11px",
+                  fontWeight: "bold",
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  textTransform: "uppercase"
+                }}
+              >
+                Update Available
+              </span>
+              <span>
+                A new version of <b>Quantum GST (v{latestVersion})</b> is available. You are running <b>v{currentVersion}</b>.
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <a
+                href={releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  background: "#0d9f91",
+                  color: "white",
+                  padding: "6px 14px",
+                  borderRadius: "6px",
+                  fontWeight: "bold",
+                  fontSize: "12px",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.15)"
+                }}
+              >
+                <DownloadCloud size={14} /> Update Now
+              </a>
+              <button
+                onClick={() => setDismissUpdate(true)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255,255,255,0.7)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+                title="Dismiss for this session"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <main className="content">
           {screen}
           <footer>

@@ -164,6 +164,34 @@ class QuantumApiClient {
     });
     return res.json();
   }
+
+  async checkLatestAppVersion(): Promise<{ hasUpdate: boolean; latestVersion: string; currentVersion: string; releaseUrl: string }> {
+    const currentVersion = "1.0.0";
+    try {
+      const res = await fetch("https://api.github.com/repos/jasimmondal57/quantum-gst-core/releases/latest", {
+        headers: { Accept: "application/vnd.github.v3+json" }
+      });
+      if (res.ok) {
+        const release = await res.json();
+        const latestVersion = (release.tag_name || "v1.0.0").replace(/^v/, "");
+        const hasUpdate = latestVersion !== currentVersion;
+        return {
+          hasUpdate,
+          latestVersion,
+          currentVersion,
+          releaseUrl: release.html_url || "https://github.com/jasimmondal57/quantum-gst-core/releases"
+        };
+      }
+    } catch {
+      // Fallback
+    }
+    return {
+      hasUpdate: false,
+      latestVersion: currentVersion,
+      currentVersion,
+      releaseUrl: "https://github.com/jasimmondal57/quantum-gst-core/releases"
+    };
+  }
 }
 
 export const api = new QuantumApiClient();
