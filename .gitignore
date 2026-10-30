@@ -1,0 +1,74 @@
+# Credentials, Private Docs, Internal Plans & System Notes
+*.md
+!README.md
+*.key
+*.pem
+*.pfx
+*.keystore
+*.log
+.env
+.env.*
+!.env.example
+server_details.md
+github_windows_setup.md
+plan.md
+quantum-gst-ui-ux-plan.md
+
+# Archives, Zips, Images & Uploads
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.png
+*.jpg
+*.jpeg
+*.svg
+!frontend/src/**/*.svg
+!frontend/public/**/*.svg
+!mobile/**/*.png
+
+# Temporary & Seed files
+seed_*.json
+*.tmp
+*.bak
+*.swp
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node & Frontend Build Artifacts
+node_modules/
+dist/
+dist-electron/
+dist-ssr/
+package-lock.json
+
+# Backend Vendor & Framework Cache
+backend/vendor/
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+backend/.env*
+!backend/.env.example
+
+# Flutter Mobile Build Artifacts
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/flutter_export_environment.sh
+*.apk
+*.aab
+
+# Standalone UI reference dumps
+quantum-gst-ui/
