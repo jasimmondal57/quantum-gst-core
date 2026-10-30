@@ -30,6 +30,7 @@ Route::prefix('v1')->group(function () {
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // GSTIN Registrations
         Route::get('/gstins', [GstinController::class, 'index']);

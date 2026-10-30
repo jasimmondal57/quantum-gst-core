@@ -61,3 +61,6 @@ mobile/ios/Flutter/flutter_export_environment.sh
 *.zip
 *.7z
 seed_*.json
+
+quantum-gst-ui/
+*.png

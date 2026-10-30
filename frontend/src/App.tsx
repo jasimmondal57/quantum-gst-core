@@ -42,8 +42,10 @@ import {
   DownloadCloud,
   ExternalLink,
   ShieldCheck,
-  GitBranch
+  GitBranch,
+  LogOut
 } from "lucide-react";
+import { AuthScreen } from "./components/AuthScreen";
 import { api } from "./services/api";
 import type { Invoice } from "./services/api";
 import {
@@ -269,6 +271,18 @@ export function App() {
   const [activeOrgId, setActiveOrgId] = useState<string>("");
   const [activeGstinId, setActiveGstinId] = useState<string>("");
 
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem("quantum_user_info");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => api.isAuthenticated());
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+
   // Onboarding Wizard State (Only opens if not previously completed or explicitly launched)
   const [isOnboarding, setIsOnboarding] = useState<boolean>(() => {
     return localStorage.getItem("quantum_onboarding_completed") !== "true";
@@ -493,8 +507,83 @@ export function App() {
     }
   };
 
-  useEffect(() => {
+  const handleAuthSuccess = (authData: any) => {
+    if (authData.user) {
+      setCurrentUser(authData.user);
+    }
+    if (authData.business) {
+      setActiveBusinessId(authData.business.id);
+      if (authData.business.legal_name) setLegalName(authData.business.legal_name);
+      if (authData.business.trade_name) setTradeName(authData.business.trade_name);
+      if (authData.business.gstins && authData.business.gstins.length > 0) {
+        const g = authData.business.gstins[0];
+        setPrimaryGstin(g.gstin);
+        setStateCode(g.state_code);
+        setStateName(g.state_name);
+        setActiveGstinId(g.id);
+      }
+    }
+    if (authData.organization) {
+      setActiveOrgId(authData.organization.id);
+    }
+    setIsAuthenticated(true);
     refreshCloudData();
+  };
+
+  const handleLogout = async () => {
+    await api.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setPage("Dashboard");
+  };
+
+  useEffect(() => {
+    const initAuthAndData = async () => {
+      if (!api.isAuthenticated()) {
+        setIsAuthenticated(false);
+        setIsAuthChecking(false);
+        return;
+      }
+
+      try {
+        const me = await api.getMe();
+        if (me && me.user) {
+          setCurrentUser(me.user);
+          setIsAuthenticated(true);
+          if (me.organization) {
+            setActiveOrgId(me.organization.id);
+          }
+          if (me.business) {
+            setActiveBusinessId(me.business.id);
+            setLegalName(me.business.legal_name || legalName);
+            setTradeName(me.business.trade_name || tradeName);
+            setPanNumber(me.business.pan || panNumber);
+            setBizEmail(me.business.email || bizEmail);
+            setBizPhone(me.business.phone || bizPhone);
+            if (me.business.gstins && me.business.gstins.length > 0) {
+              const g = me.business.gstins[0];
+              setPrimaryGstin(g.gstin);
+              setStateCode(g.state_code);
+              setStateName(g.state_name);
+              setActiveGstinId(g.id);
+              if (g.address_line1) setAddressLine(g.address_line1);
+              if (g.city) setCity(g.city);
+              if (g.pincode) setPincode(g.pincode);
+            }
+          }
+          await refreshCloudData();
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch {
+        api.clearToken();
+        setIsAuthenticated(false);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    initAuthAndData();
   }, []);
 
   const subtotal = items.reduce((acc, curr) => acc + curr.qty * curr.rate, 0);
@@ -573,6 +662,39 @@ export function App() {
       setIsSyncing(false);
     }
   };
+
+  // ================= AUTHENTICATION GATE =================
+  if (isAuthChecking) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f4f7fb", display: "grid", placeItems: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              background: "#123b73",
+              color: "white",
+              fontSize: "24px",
+              fontWeight: "bold",
+              width: "56px",
+              height: "56px",
+              borderRadius: "14px",
+              display: "grid",
+              placeItems: "center",
+              margin: "0 auto 16px",
+              boxShadow: "0 8px 24px rgba(18,59,115,0.2)"
+            }}
+          >
+            Q
+          </div>
+          <h3 style={{ margin: "0 0 6px", color: "#123b73", fontSize: "18px", fontWeight: "bold" }}>Quantum GST</h3>
+          <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>Connecting to secure cloud session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
 
   // ================= ONBOARDING MODAL / SCREEN =================
   if (isOnboarding) {
@@ -874,12 +996,37 @@ export function App() {
           Get support <ArrowUpRight size={12} />
         </a>
       </div>
-      <div className="profile">
-        <b className="avatar">AM</b>
-        <span>
-          {tradeName}
-          <small>Admin account</small>
-        </span>
+      <div className="profile" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
+          <b className="avatar">
+            {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "QG"}
+          </b>
+          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontWeight: 600, fontSize: "13px", color: "#fff", textOverflow: "ellipsis", overflow: "hidden" }}>
+              {currentUser?.name || tradeName}
+            </div>
+            <small style={{ color: "#93c5fd", display: "block", fontSize: "11px", textOverflow: "ellipsis", overflow: "hidden" }}>
+              {currentUser?.email || "Admin account"}
+            </small>
+          </span>
+        </div>
+        <button
+          onClick={handleLogout}
+          title="Sign out of Quantum GST"
+          style={{
+            background: "rgba(255, 255, 255, 0.12)",
+            border: "none",
+            borderRadius: "6px",
+            padding: "7px",
+            color: "#e2e8f0",
+            cursor: "pointer",
+            display: "grid",
+            placeItems: "center",
+            flexShrink: 0
+          }}
+        >
+          <LogOut size={15} />
+        </button>
       </div>
     </aside>
   );
@@ -1817,10 +1964,40 @@ export function App() {
               <Sliders size={13} /> Setup Wizard
             </button>
             <Bell size={18} style={{ color: "#718096", cursor: "pointer" }} />
-            <b className="avatar">AM</b>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              {tradeName} <ChevronDown size={13} />
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid #e2e8f0", paddingLeft: "12px" }}>
+              <b className="avatar">
+                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "QG"}
+              </b>
+              <div style={{ display: "flex", flexDirection: "column", textAlign: "left", lineHeight: 1.2 }}>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
+                  {currentUser?.name || tradeName}
+                </span>
+                <span style={{ fontSize: "10px", color: "#64748b" }}>
+                  {currentUser?.email || "Administrator"}
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  border: "1px solid #fee2e2",
+                  borderRadius: "6px",
+                  padding: "4px 8px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  marginLeft: "4px"
+                }}
+                title="Sign Out"
+              >
+                <LogOut size={12} />
+                Logout
+              </button>
+            </div>
           </div>
         </header>
 

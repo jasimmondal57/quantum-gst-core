@@ -1,13 +1,19 @@
+export interface AuthUser {
+  id: number | string;
+  name: string;
+  email: string;
+}
+
 export interface BusinessProfile {
   id: string;
   organization_id: string;
   legal_name: string;
   trade_name: string;
-  pan: string;
-  email: string;
-  phone: string;
-  currency: string;
-  status: string;
+  pan?: string;
+  email?: string;
+  phone?: string;
+  currency?: string;
+  status?: string;
   gstins?: Array<{
     id: string;
     gstin: string;
@@ -67,7 +73,10 @@ export interface Invoice {
   items?: InvoiceItem[];
 }
 
-const API_BASE = "https://quantumgst.in/api/v1";
+const API_BASE =
+  typeof window !== "undefined" && window.location.origin.includes("quantumgst.in")
+    ? `${window.location.origin}/api/v1`
+    : "https://quantumgst.in/api/v1";
 
 class QuantumApiClient {
   private token: string | null = null;
@@ -81,20 +90,33 @@ class QuantumApiClient {
     localStorage.setItem("quantum_token", token);
   }
 
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem("quantum_token");
+    localStorage.removeItem("quantum_user_info");
+  }
+
   getToken() {
-    return this.token;
+    return this.token || localStorage.getItem("quantum_token");
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
   }
 
   private getHeaders() {
+    const activeToken = this.getToken();
     return {
       "Content-Type": "application/json",
       Accept: "application/json",
-      ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
+      ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {})
     };
   }
 
   async checkOnboardingStatus() {
-    const res = await fetch(`${API_BASE}/onboarding/status`);
+    const res = await fetch(`${API_BASE}/onboarding/status`, {
+      headers: this.getHeaders()
+    });
     return res.json();
   }
 
@@ -111,17 +133,93 @@ class QuantumApiClient {
     return json;
   }
 
+  async register(data: {
+    name: string;
+    email: string;
+    password: string;
+    organization_name?: string;
+    business_legal_name?: string;
+    gstin?: string;
+    state_code?: string;
+    state_name?: string;
+  }) {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const errorMsg =
+        json.message ||
+        (json.errors ? Object.values(json.errors).flat().join(" ") : "Registration failed.");
+      throw new Error(errorMsg);
+    }
+    if (json.token) {
+      this.setToken(json.token);
+      if (json.user) {
+        localStorage.setItem("quantum_user_info", JSON.stringify(json.user));
+      }
+    }
+    return json;
+  }
+
   async login(email: string, password: string) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
-      headers: this.getHeaders(),
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
       body: JSON.stringify({ email, password })
     });
     const json = await res.json();
+    if (!res.ok) {
+      const errorMsg =
+        json.message ||
+        (json.errors ? Object.values(json.errors).flat().join(" ") : "Invalid email or password.");
+      throw new Error(errorMsg);
+    }
     if (json.token) {
       this.setToken(json.token);
+      if (json.user) {
+        localStorage.setItem("quantum_user_info", JSON.stringify(json.user));
+      }
     }
     return json;
+  }
+
+  async getMe() {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        this.clearToken();
+      }
+      throw new Error("Session expired. Please sign in again.");
+    }
+    const json = await res.json();
+    if (json.user) {
+      localStorage.setItem("quantum_user_info", JSON.stringify(json.user));
+    }
+    return json;
+  }
+
+  async logout() {
+    try {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: this.getHeaders()
+      });
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      this.clearToken();
+    }
   }
 
   async fetchInvoices(businessId?: string): Promise<{ data: Invoice[] }> {
@@ -195,4 +293,3 @@ class QuantumApiClient {
 }
 
 export const api = new QuantumApiClient();
-

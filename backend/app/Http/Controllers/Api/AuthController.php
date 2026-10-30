@@ -20,8 +20,8 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
-            'organization_name' => 'required|string|max:255',
-            'business_legal_name' => 'required|string|max:255',
+            'organization_name' => 'nullable|string|max:255',
+            'business_legal_name' => 'nullable|string|max:255',
             'gstin' => 'nullable|string|size:15',
             'state_code' => 'nullable|string|size:2',
             'state_name' => 'nullable|string|max:100',
@@ -33,9 +33,17 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        $orgName = !empty($validated['organization_name'])
+            ? $validated['organization_name']
+            : ($validated['name'] . ' Enterprises');
+
+        $bizName = !empty($validated['business_legal_name'])
+            ? $validated['business_legal_name']
+            : $orgName;
+
         $organization = Organization::create([
-            'name' => $validated['organization_name'],
-            'slug' => Str::slug($validated['organization_name']) . '-' . Str::random(5),
+            'name' => $orgName,
+            'slug' => Str::slug($orgName) . '-' . Str::random(5),
             'status' => 'active',
         ]);
 
@@ -47,18 +55,22 @@ class AuthController extends Controller
 
         $business = Business::create([
             'organization_id' => $organization->id,
-            'legal_name' => $validated['business_legal_name'],
-            'trade_name' => $validated['business_legal_name'],
+            'legal_name' => $bizName,
+            'trade_name' => $bizName,
             'email' => $validated['email'],
         ]);
 
-        if (!empty($validated['gstin']) && !empty($validated['state_code'])) {
+        if (!empty($validated['gstin'])) {
+            $gstinUpper = strtoupper($validated['gstin']);
+            $derivedStateCode = !empty($validated['state_code']) ? $validated['state_code'] : substr($gstinUpper, 0, 2);
+            $derivedStateName = !empty($validated['state_name']) ? $validated['state_name'] : 'State (' . $derivedStateCode . ')';
+
             BusinessGstin::create([
                 'business_id' => $business->id,
-                'gstin' => strtoupper($validated['gstin']),
-                'state_code' => $validated['state_code'],
-                'state_name' => $validated['state_name'] ?? 'State',
-                'legal_name' => $validated['business_legal_name'],
+                'gstin' => $gstinUpper,
+                'state_code' => $derivedStateCode,
+                'state_name' => $derivedStateName,
+                'legal_name' => $bizName,
                 'is_primary' => true,
                 'status' => 'active',
             ]);
@@ -85,11 +97,11 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Invalid credentials provided.'],
+                'email' => ['Invalid email or password provided.'],
             ]);
         }
 
-        $organization = $user->organizations()->first();
+        $organization = $user->organizations()->with('businesses.gstins')->first();
         $business = $organization ? $organization->businesses()->first() : null;
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -105,10 +117,25 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $organizations = $user->organizations()->with('businesses.gstins')->get();
+        $primaryOrg = $organizations->first();
+        $primaryBusiness = $primaryOrg ? $primaryOrg->businesses->first() : null;
 
         return response()->json([
             'user' => $user,
             'organizations' => $organizations,
+            'organization' => $primaryOrg,
+            'business' => $primaryBusiness,
+        ]);
+    }
+
+    public function logout(Request $request)
+    {
+        if ($request->user() && $request->user()->currentAccessToken()) {
+            $request->user()->currentAccessToken()->delete();
+        }
+
+        return response()->json([
+            'message' => 'Logged out successfully',
         ]);
     }
 }
