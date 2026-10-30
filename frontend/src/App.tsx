@@ -33,7 +33,6 @@ import {
   Check,
   Eye,
   Save,
-  Sliders,
   FolderDown,
   Sparkles,
   Layers,
@@ -1240,8 +1239,8 @@ export function App() {
           sub="Welcome back! Here's your business overview."
           action={
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn secondary onClick={() => setIsOnboarding(true)}>
-                <Sliders size={14} /> Setup Wizard
+              <Btn onClick={() => setPage("Billing")}>
+                <Plus size={14} style={{ marginRight: "4px" }} /> New Invoice
               </Btn>
               <button className="date">
                 <CalendarDays size={15} /> Current Financial Period <ChevronDown size={13} style={{ marginLeft: "4px" }} />
@@ -2132,11 +2131,6 @@ export function App() {
         <Heading
           title="Settings"
           sub="Manage your business settings"
-          action={
-            <Btn secondary onClick={() => setIsOnboarding(true)}>
-              <Sliders size={14} style={{ marginRight: "4px" }} /> Launch Onboarding Wizard
-            </Btn>
-          }
         />
         <div className="tabs">
           <span style={{ fontWeight: "bold" }}>Business Profile</span>
@@ -2375,23 +2369,6 @@ export function App() {
               {syncStatus.includes("Synced") ? <CheckCheck size={13} /> : <Cloud size={13} />}
               <span>{syncStatus}</span>
             </div>
-            <button
-              onClick={() => setIsOnboarding(true)}
-              style={{
-                background: "#eaf2ff",
-                color: "#1d5fbf",
-                border: "1px solid #1d5fbf",
-                borderRadius: "6px",
-                padding: "6px 10px",
-                fontSize: "11px",
-                fontWeight: "bold",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px"
-              }}
-            >
-              <Sliders size={13} /> Setup Wizard
-            </button>
             <Bell size={18} style={{ color: "#718096", cursor: "pointer" }} />
             <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid #e2e8f0", paddingLeft: "12px" }}>
               <b className="avatar">
