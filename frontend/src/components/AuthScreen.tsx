@@ -197,22 +197,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         >
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px" }}>
-              <div
+              <img
+                src="/logo.png"
+                alt="Quantum GST"
                 style={{
-                  background: "#ffffff",
-                  color: "#123b73",
-                  fontWeight: 900,
-                  fontSize: "20px",
-                  width: "42px",
-                  height: "42px",
+                  width: "46px",
+                  height: "46px",
                   borderRadius: "10px",
-                  display: "grid",
-                  placeItems: "center",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+                  objectFit: "cover",
+                  background: "#ffffff",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.2)"
                 }}
-              >
-                Q
-              </div>
+              />
               <div>
                 <div style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.5px" }}>
                   Quantum <span style={{ color: "#60a5fa" }}>GST</span>

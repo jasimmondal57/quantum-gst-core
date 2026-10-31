@@ -1805,7 +1805,7 @@ export function App() {
   const side = (
     <aside className={"sidebar " + (mobile ? "open" : "")}>
       <div className="brand">
-        <b className="logo">Q</b> Quantum <b>GST</b>
+        <img src="/logo.png" alt="Quantum GST" className="logo-img" /> Quantum <b>GST</b>
         <button className="close" onClick={() => setMobile(false)}>
           <X size={18} />
         </button>
