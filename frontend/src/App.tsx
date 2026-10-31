@@ -4418,18 +4418,7 @@ export function App() {
                 <Field label="Permanent Account Number (PAN)" value={panNumber} onChange={setPanNumber} />
                 <Field label="Registered State" value={`${stateName} (${stateCode})`} />
               </div>
-              <div className="save" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Btn secondary onClick={handleManualCheckUpdate}>
-                    <RefreshCw size={13} className={checkingUpdate ? "spin" : ""} style={{ marginRight: "4px" }} />
-                    Check for Updates
-                  </Btn>
-                  {updateCheckMsg && (
-                    <span style={{ fontSize: "11px", color: updateCheckMsg.includes("found") ? "#0d9f91" : "#718096", fontWeight: "500" }}>
-                      {updateCheckMsg}
-                    </span>
-                  )}
-                </div>
+              <div className="save" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
                 <Btn onClick={() => showSaveSuccess("Business Profile updated successfully!")}>
                   <Save size={13} style={{ marginRight: "5px" }} /> Save Business Details
                 </Btn>
