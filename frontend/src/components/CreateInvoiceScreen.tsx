@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  FileText,
   Search,
   Plus,
   Trash2,
@@ -17,9 +16,28 @@ import {
   X,
   FileCheck,
   Barcode,
-  Layers
+  Layers,
+  ShoppingCart,
+  Package,
+  Receipt,
+  FileSpreadsheet,
+  CornerUpLeft,
+  CornerDownRight,
+  ClipboardList
 } from "lucide-react";
 import { api } from "../services/api";
+import { COMMON_HSN_MASTER, validateHsnCompliance } from "../utils/hsnMaster";
+import { generateUpiQrDataUrl } from "../utils/upiQr";
+
+export type DocumentCategory =
+  | "Sales Invoice"
+  | "POS Invoice (Quick Retail)"
+  | "Purchase Bill"
+  | "Quotation / Estimate"
+  | "Credit Note (Sales Return)"
+  | "Debit Note (Purchase Return)"
+  | "Delivery Challan"
+  | "Proforma Invoice";
 
 export interface CreateInvoiceProps {
   primaryGstin: string;
@@ -55,6 +73,25 @@ export interface InvoiceItemRow {
   expDate?: string;
   inStock?: number;
 }
+
+const DOCUMENT_CATEGORIES: Array<{
+  id: DocumentCategory;
+  label: string;
+  short: string;
+  icon: any;
+  defaultPrefix: string;
+  partyLabel: string;
+  isPurchase: boolean;
+}> = [
+  { id: "Sales Invoice", label: "Sales Invoice", short: "Sales", icon: ShoppingCart, defaultPrefix: "QGST/2026-27/", partyLabel: "Customer / Client", isPurchase: false },
+  { id: "POS Invoice (Quick Retail)", label: "POS Quick Retail Bill", short: "POS Retail", icon: Receipt, defaultPrefix: "POS/2026/", partyLabel: "Walk-in Customer", isPurchase: false },
+  { id: "Purchase Bill", label: "Purchase Bill (Inward Supply)", short: "Purchase", icon: Package, defaultPrefix: "PUR/2026-27/", partyLabel: "Supplier / Vendor", isPurchase: true },
+  { id: "Quotation / Estimate", label: "Quotation / Price Estimate", short: "Quotation", icon: FileSpreadsheet, defaultPrefix: "QTN/2026/", partyLabel: "Prospective Client", isPurchase: false },
+  { id: "Proforma Invoice", label: "Proforma Invoice", short: "Proforma", icon: ClipboardList, defaultPrefix: "PI/2026-27/", partyLabel: "Customer / Client", isPurchase: false },
+  { id: "Credit Note (Sales Return)", label: "Credit Note (Sales Return)", short: "Credit Note", icon: CornerUpLeft, defaultPrefix: "CN/2026-27/", partyLabel: "Customer (Return Credit)", isPurchase: false },
+  { id: "Debit Note (Purchase Return)", label: "Debit Note (Purchase Return)", short: "Debit Note", icon: CornerDownRight, defaultPrefix: "DN/2026-27/", partyLabel: "Supplier (Vendor Debit)", isPurchase: true },
+  { id: "Delivery Challan", label: "Delivery Challan (Job Work / Transport)", short: "Challan", icon: Truck, defaultPrefix: "DC/2026-27/", partyLabel: "Consignee / Job Worker", isPurchase: false }
+];
 
 const INDIAN_STATES = [
   { code: "01", name: "Jammu and Kashmir" },
@@ -106,7 +143,8 @@ const PRESET_CUSTOMERS = [
     billingAddress: "Plot 42, MIDC Industrial Area, Andheri East, Mumbai",
     billingPincode: "400093",
     outstanding: 42500,
-    creditLimit: 200000
+    creditLimit: 200000,
+    type: "customer"
   },
   {
     id: "cust-2",
@@ -120,10 +158,26 @@ const PRESET_CUSTOMERS = [
     billingAddress: "12/A Park Street, 4th Floor, Kolkata",
     billingPincode: "700016",
     outstanding: 15400,
-    creditLimit: 100000
+    creditLimit: 100000,
+    type: "customer"
   },
   {
     id: "cust-3",
+    name: "Delta Electronics Hardware & Wholesale",
+    mobile: "9845012345",
+    email: "sales@deltaelectronics.in",
+    gstin: "27AABCD9988Q1Z4",
+    regType: "Regular",
+    stateCode: "27",
+    stateName: "Maharashtra",
+    billingAddress: "Shop 14, Lamington Road, Grant Road, Mumbai",
+    billingPincode: "400007",
+    outstanding: 85000,
+    creditLimit: 500000,
+    type: "supplier"
+  },
+  {
+    id: "cust-4",
     name: "Bengaluru HyperCloud Logistics",
     mobile: "9740556677",
     email: "finance@hypercloud.tech",
@@ -134,21 +188,23 @@ const PRESET_CUSTOMERS = [
     billingAddress: "77 Outer Ring Road, Bellandur, Bengaluru",
     billingPincode: "560103",
     outstanding: 0,
-    creditLimit: 350000
+    creditLimit: 350000,
+    type: "customer"
   },
   {
-    id: "cust-4",
-    name: "Rohit Sharma (Direct Consumer)",
+    id: "cust-5",
+    name: "Walk-in Counter Customer (Retail)",
     mobile: "9988776655",
-    email: "rohit.sharma@gmail.com",
+    email: "",
     gstin: "",
     regType: "Consumer",
     stateCode: "27",
     stateName: "Maharashtra",
-    billingAddress: "Flat 402, Sunshine Heights, Pune",
-    billingPincode: "411001",
+    billingAddress: "Local Store Counter",
+    billingPincode: "400001",
     outstanding: 0,
-    creditLimit: 0
+    creditLimit: 0,
+    type: "customer"
   }
 ];
 
@@ -159,6 +215,7 @@ const PRESET_PRODUCTS = [
     sku: "SHIRT-BLU-L",
     hsn: "6205",
     rate: 1250,
+    purchaseRate: 850,
     unit: "PCS",
     gstRate: 5,
     cessRate: 0,
@@ -170,6 +227,7 @@ const PRESET_PRODUCTS = [
     sku: "SAREE-BAN-01",
     hsn: "5007",
     rate: 3450,
+    purchaseRate: 2300,
     unit: "PCS",
     gstRate: 5,
     cessRate: 0,
@@ -181,6 +239,7 @@ const PRESET_PRODUCTS = [
     sku: "POS-PRN-80",
     hsn: "8443",
     rate: 5800,
+    purchaseRate: 4100,
     unit: "NOS",
     gstRate: 18,
     cessRate: 0,
@@ -192,6 +251,7 @@ const PRESET_PRODUCTS = [
     sku: "SCN-W2D-09",
     hsn: "8471",
     rate: 2600,
+    purchaseRate: 1750,
     unit: "NOS",
     gstRate: 18,
     cessRate: 0,
@@ -203,6 +263,7 @@ const PRESET_PRODUCTS = [
     sku: "ROLL-79-50",
     hsn: "4811",
     rate: 950,
+    purchaseRate: 620,
     unit: "BOX",
     gstRate: 12,
     cessRate: 0,
@@ -214,6 +275,7 @@ const PRESET_PRODUCTS = [
     sku: "SRV-ERP-AMC",
     hsn: "998314",
     rate: 25000,
+    purchaseRate: 18000,
     unit: "SRV",
     gstRate: 18,
     cessRate: 0,
@@ -236,8 +298,11 @@ export function CreateInvoiceScreen({
   onInvoiceCreated,
   onPreview
 }: CreateInvoiceProps) {
-  // Document Type & Numbering
+  // Document Type Header State
+  const [docCategory, setDocCategory] = useState<DocumentCategory>("Sales Invoice");
   const [invoiceType, setInvoiceType] = useState<"Tax Invoice" | "Bill of Supply">("Tax Invoice");
+  
+  // Numbering and Dates
   const [invoiceNo, setInvoiceNo] = useState("QGST/2026-27/0042");
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [paymentTerms, setPaymentTerms] = useState("Immediate");
@@ -249,7 +314,11 @@ export function CreateInvoiceScreen({
   const [priceList, setPriceList] = useState("Standard / Retail");
   const [warehouse, setWarehouse] = useState("Main Central Godown");
 
-  // Customer / Party Details
+  // Party Selection (Customer or Supplier depending on Doc Category)
+  const currentCategoryConfig = useMemo(() => {
+    return DOCUMENT_CATEGORIES.find((c) => c.id === docCategory) || DOCUMENT_CATEGORIES[0];
+  }, [docCategory]);
+
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
@@ -263,7 +332,7 @@ export function CreateInvoiceScreen({
   const [reverseCharge, setReverseCharge] = useState(false);
   const [customerCredit, setCustomerCredit] = useState({ outstanding: 0, limit: 0 });
 
-  // Quick Customer Modal
+  // Quick Customer / Supplier Modal
   const [showQuickCustomerModal, setShowQuickCustomerModal] = useState(false);
   const [newCustName, setNewCustName] = useState("");
   const [newCustGstin, setNewCustGstin] = useState("");
@@ -330,6 +399,31 @@ export function CreateInvoiceScreen({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showInstantPdfModal, setShowInstantPdfModal] = useState(false);
   const [pdfTemplate, setPdfTemplate] = useState<"modern-a4" | "compact-a5" | "thermal-pos">("modern-a4");
+  const [payeeUpiVpa, setPayeeUpiVpa] = useState("quantumgst@okhdfcbank");
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState<string>("");
+  const [isExport, setIsExport] = useState(false);
+  const [exportType, setExportType] = useState<"LUT" | "IGST">("LUT");
+  const [originalInvoiceNo, setOriginalInvoiceNo] = useState("");
+
+  // Switch Document Category Handler
+  const handleSelectDocCategory = (cat: DocumentCategory) => {
+    setDocCategory(cat);
+    const config = DOCUMENT_CATEGORIES.find((c) => c.id === cat) || DOCUMENT_CATEGORIES[0];
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    setInvoiceNo(`${config.defaultPrefix}${randomNum}`);
+
+    // Adjust defaults based on category
+    if (cat === "Purchase Bill" || cat === "Debit Note (Purchase Return)") {
+      const supplier = PRESET_CUSTOMERS.find((c) => c.type === "supplier") || PRESET_CUSTOMERS[2];
+      handleSelectCustomer(supplier);
+    } else if (cat === "POS Invoice (Quick Retail)") {
+      setPdfTemplate("thermal-pos");
+      const walkIn = PRESET_CUSTOMERS.find((c) => c.regType === "Consumer") || PRESET_CUSTOMERS[4];
+      handleSelectCustomer(walkIn);
+    } else {
+      setPdfTemplate("modern-a4");
+    }
+  };
 
   // Determine Inter-state vs Intra-state based on Place of Supply (POS)
   const isInterState = useMemo(() => {
@@ -352,9 +446,11 @@ export function CreateInvoiceScreen({
       let sgst = 0;
       let igst = 0;
 
-      if (invoiceType === "Bill of Supply") {
-        // Zero tax in composition / bill of supply
-      } else if (isInterState) {
+      if (invoiceType === "Bill of Supply" || docCategory === "Delivery Challan") {
+        // Zero tax on composition bill of supply or transport challan
+      } else if (isExport && exportType === "LUT") {
+        // Zero tax on Exports under LUT/Bond without IGST
+      } else if (isInterState || isExport) {
         igst = (taxable * (Number(item.gstRate) || 0)) / 100;
       } else {
         cgst = (taxable * ((Number(item.gstRate) || 0) / 2)) / 100;
@@ -378,7 +474,7 @@ export function CreateInvoiceScreen({
         netTotal
       };
     });
-  }, [items, isInterState, invoiceType]);
+  }, [items, isInterState, invoiceType, docCategory]);
 
   // Aggregate Totals
   const totals = useMemo(() => {
@@ -431,6 +527,21 @@ export function CreateInvoiceScreen({
       handleSelectCustomer(PRESET_CUSTOMERS[0]);
     }
   }, []);
+
+  // Real-time Dynamic UPI QR generation for 2026 Retail & POS Compliance
+  useEffect(() => {
+    let isMounted = true;
+    generateUpiQrDataUrl({
+      payeeVpa: payeeUpiVpa,
+      payeeName: tradeName || legalName || "QuantumGST",
+      amount: totals.grandTotal,
+      transactionNote: invoiceNo + " Settlement",
+      transactionRef: invoiceNo.replace(/[^a-zA-Z0-9]/g, "").slice(-12)
+    }).then((url) => {
+      if (isMounted) setUpiQrDataUrl(url);
+    });
+    return () => { isMounted = false; };
+  }, [totals.grandTotal, invoiceNo, payeeUpiVpa, tradeName, legalName]);
 
   const handleSelectCustomer = (cust: (typeof PRESET_CUSTOMERS)[0]) => {
     setCustomerId(cust.id);
@@ -495,6 +606,7 @@ export function CreateInvoiceScreen({
   };
 
   const handleSelectProduct = (prod: (typeof PRESET_PRODUCTS)[0]) => {
+    const applicableRate = currentCategoryConfig.isPurchase && prod.purchaseRate ? prod.purchaseRate : prod.rate;
     if (activeRowIdForProduct) {
       setItems((prev) =>
         prev.map((it) =>
@@ -505,7 +617,7 @@ export function CreateInvoiceScreen({
                 name: prod.name,
                 sku: prod.sku,
                 hsn: prod.hsn,
-                rate: prod.rate,
+                rate: applicableRate,
                 unit: prod.unit,
                 gstRate: prod.gstRate,
                 cessRate: prod.cessRate,
@@ -545,11 +657,11 @@ export function CreateInvoiceScreen({
   // Save / Finalize Invoice Execution
   const handleSaveInvoice = async () => {
     if (!customerName.trim()) {
-      alert("Please select or enter a Customer Name.");
+      alert(`Please select or enter a valid ${currentCategoryConfig.partyLabel} Name.`);
       return;
     }
     if (items.some((it) => !it.name.trim() || it.rate <= 0)) {
-      alert("Please ensure all invoice items have valid product names and non-zero rates.");
+      alert("Please ensure all items have valid descriptions and non-zero rates.");
       return;
     }
 
@@ -588,7 +700,7 @@ export function CreateInvoiceScreen({
 
   const handleCreateQuickCustomer = () => {
     if (!newCustName.trim()) {
-      alert("Customer Name is required.");
+      alert("Party Name is required.");
       return;
     }
     const newCust = {
@@ -603,7 +715,8 @@ export function CreateInvoiceScreen({
       billingAddress: newCustAddress,
       billingPincode: "400001",
       outstanding: 0,
-      creditLimit: 50000
+      creditLimit: 50000,
+      type: currentCategoryConfig.isPurchase ? "supplier" : "customer"
     };
     PRESET_CUSTOMERS.unshift(newCust);
     handleSelectCustomer(newCust);
@@ -614,8 +727,58 @@ export function CreateInvoiceScreen({
     setNewCustAddress("");
   };
 
+  const CurrentIcon = currentCategoryConfig.icon;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* ================= 0. TOP DOCUMENT TYPE SELECTOR BAR ================= */}
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "14px",
+          border: "1px solid #e2e8f0",
+          padding: "12px 16px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          overflowX: "auto"
+        }}
+      >
+        <span style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", marginRight: "6px", whiteSpace: "nowrap" }}>
+          Document Type:
+        </span>
+        {DOCUMENT_CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          const active = docCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => handleSelectDocCategory(cat.id)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: active ? "2px solid #1677e8" : "1px solid #e2e8f0",
+                background: active ? "#eff6ff" : "#ffffff",
+                color: active ? "#1d4ed8" : "#475569",
+                fontWeight: active ? 800 : 600,
+                fontSize: "12px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+                boxShadow: active ? "0 2px 6px rgba(22, 119, 232, 0.15)" : "none"
+              }}
+            >
+              <Icon size={14} style={{ color: active ? "#1677e8" : "#64748b" }} />
+              {cat.short}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ================= 1. HEADER SECTION & ACTIONS ================= */}
       <div
         style={{
@@ -635,8 +798,8 @@ export function CreateInvoiceScreen({
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div
               style={{
-                width: "40px",
-                height: "40px",
+                width: "42px",
+                height: "42px",
                 borderRadius: "10px",
                 background: "linear-gradient(135deg, #123b78, #1677e8)",
                 display: "grid",
@@ -644,12 +807,12 @@ export function CreateInvoiceScreen({
                 color: "#ffffff"
               }}
             >
-              <FileText size={20} />
+              <CurrentIcon size={20} />
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#1e293b" }}>
-                  Create Sales Invoice
+                  Create {currentCategoryConfig.label}
                 </h1>
                 <span
                   onClick={() => setInvoiceType(invoiceType === "Tax Invoice" ? "Bill of Supply" : "Tax Invoice")}
@@ -752,7 +915,7 @@ export function CreateInvoiceScreen({
             }}
           >
             <Save size={15} />
-            {isSaving ? "Finalizing..." : "Save & Finalize (F9)"}
+            {isSaving ? "Finalizing..." : `Save ${currentCategoryConfig.short} (F9)`}
           </button>
         </div>
       </div>
@@ -773,7 +936,7 @@ export function CreateInvoiceScreen({
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: 600 }}>
             <CheckCircle2 size={18} style={{ color: "#10b981" }} />
-            Invoice <b>{invoiceNo}</b> saved successfully! Stock counts decremented and customer ledger posted.
+            {currentCategoryConfig.label} <b>{invoiceNo}</b> saved successfully! Stock counts updated and accounts posted.
           </div>
           <button
             onClick={() => setShowInstantPdfModal(true)}
@@ -795,7 +958,7 @@ export function CreateInvoiceScreen({
 
       {/* ================= 2. CONFIGURATION & CUSTOMER BAR ================= */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "18px" }}>
-        {/* Bill To / Customer Card */}
+        {/* Bill To / Party Card */}
         <div
           style={{
             background: "#ffffff",
@@ -809,7 +972,7 @@ export function CreateInvoiceScreen({
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Building size={16} style={{ color: "#1677e8" }} />
               <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-                Bill To (Customer / Party)
+                {currentCategoryConfig.isPurchase ? "Bill From (Supplier / Vendor)" : "Bill To (Customer / Party)"}
               </h3>
             </div>
             <button
@@ -828,7 +991,7 @@ export function CreateInvoiceScreen({
                 cursor: "pointer"
               }}
             >
-              <UserPlus size={12} /> + New Customer
+              <UserPlus size={12} /> + New {currentCategoryConfig.isPurchase ? "Vendor" : "Customer"}
             </button>
           </div>
 
@@ -846,7 +1009,7 @@ export function CreateInvoiceScreen({
             >
               <Search size={16} style={{ color: "#94a3b8", marginRight: "8px" }} />
               <input
-                placeholder="Search party by name, mobile, GSTIN... (Press F2)"
+                placeholder={`Search ${currentCategoryConfig.partyLabel} by name, mobile, GSTIN... (Press F2)`}
                 value={customerSearch || customerName}
                 onChange={(e) => {
                   setCustomerSearch(e.target.value);
@@ -937,7 +1100,7 @@ export function CreateInvoiceScreen({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12px" }}>
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Customer GSTIN
+                {currentCategoryConfig.isPurchase ? "Vendor GSTIN" : "Customer GSTIN"}
               </label>
               <input
                 value={customerGstin}
@@ -1112,14 +1275,14 @@ export function CreateInvoiceScreen({
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
             <FileCheck size={16} style={{ color: "#1677e8" }} />
             <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-              Invoice Parameters & Terms
+              Document Parameters & Series
             </h3>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12px" }}>
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Invoice Series & Number
+                {currentCategoryConfig.short} Number
               </label>
               <input
                 value={invoiceNo}
@@ -1138,7 +1301,7 @@ export function CreateInvoiceScreen({
 
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Invoice Date
+                Document Date
               </label>
               <input
                 type="date"
@@ -1204,7 +1367,7 @@ export function CreateInvoiceScreen({
 
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Warehouse / Godown
+                Godown / Location
               </label>
               <select
                 value={warehouse}
@@ -1226,7 +1389,7 @@ export function CreateInvoiceScreen({
 
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Price List / Scheme
+                Pricing Tier
               </label>
               <select
                 value={priceList}
@@ -1245,6 +1408,62 @@ export function CreateInvoiceScreen({
                 <option value="Distributor (Special)">Distributor (Special)</option>
               </select>
             </div>
+
+            {/* October 2026 Statutory Fields */}
+            {(docCategory === "Credit Note (Sales Return)" || docCategory === "Debit Note (Purchase Return)") && (
+              <div>
+                <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
+                  Original Invoice Ref
+                </label>
+                <input
+                  value={originalInvoiceNo}
+                  onChange={(e) => setOriginalInvoiceNo(e.target.value)}
+                  placeholder="e.g. QGST/2026-27/0010"
+                  style={{
+                    width: "100%",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "12px"
+                  }}
+                />
+              </div>
+            )}
+
+            {docCategory === "Sales Invoice" && (
+              <div>
+                <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
+                  Supply Nature
+                </label>
+                <select
+                  value={isExport ? (exportType === "LUT" ? "export_lut" : "export_igst") : "domestic"}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "domestic") {
+                      setIsExport(false);
+                    } else if (val === "export_lut") {
+                      setIsExport(true);
+                      setExportType("LUT");
+                    } else {
+                      setIsExport(true);
+                      setExportType("IGST");
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "12px",
+                    background: "#ffffff"
+                  }}
+                >
+                  <option value="domestic">Domestic Supply</option>
+                  <option value="export_lut">Export / SEZ under LUT (No IGST)</option>
+                  <option value="export_igst">Export with Payment of IGST</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1263,7 +1482,7 @@ export function CreateInvoiceScreen({
               }}
             >
               <Truck size={14} />
-              {showTransportSection ? "Hide Transport / E-way Details" : "+ Add Transport & E-Way Bill Details"}
+              {showTransportSection ? "Hide Transport Details" : "+ Add Transport & E-Way Details"}
             </button>
             <span style={{ fontSize: "11px", color: "#94a3b8" }}>
               Origin: {stateName} ({stateCode}) | Mobile: {customerMobile}
@@ -1377,7 +1596,9 @@ export function CreateInvoiceScreen({
                 <th style={{ padding: "10px 8px", width: "95px" }}>HSN/SAC</th>
                 <th style={{ padding: "10px 8px", width: "75px" }}>Qty</th>
                 <th style={{ padding: "10px 8px", width: "75px" }}>Unit</th>
-                <th style={{ padding: "10px 8px", width: "105px" }}>Rate (₹)</th>
+                <th style={{ padding: "10px 8px", width: "105px" }}>
+                  {currentCategoryConfig.isPurchase ? "Cost Rate (₹)" : "Selling Rate (₹)"}
+                </th>
                 <th style={{ padding: "10px 8px", width: "85px" }}>Discount</th>
                 <th style={{ padding: "10px 8px", width: "105px" }}>Taxable (₹)</th>
                 <th style={{ padding: "10px 8px", width: "80px" }}>GST %</th>
@@ -1431,19 +1652,44 @@ export function CreateInvoiceScreen({
 
                   {/* HSN */}
                   <td style={{ padding: "10px 8px" }}>
-                    <input
-                      value={row.hsn}
-                      onChange={(e) => handleUpdateItem(row.id, "hsn", e.target.value)}
-                      placeholder="HSN"
-                      style={{
-                        width: "100%",
-                        padding: "6px 6px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "12px",
-                        fontFamily: "monospace"
-                      }}
-                    />
+                    {(() => {
+                      const isB2B = Boolean(customerGstin && customerGstin.length === 15);
+                      const hsnValidation = validateHsnCompliance(row.hsn, isB2B, false, isExport);
+                      return (
+                        <div>
+                          <input
+                            value={row.hsn}
+                            onChange={(e) => {
+                              const val = e.target.value.trim();
+                              handleUpdateItem(row.id, "hsn", val);
+                              const matched = COMMON_HSN_MASTER.find((m) => m.hsn === val);
+                              if (matched) {
+                                handleUpdateItem(row.id, "gstRate", matched.gstRate);
+                                if (matched.cessRate !== undefined) {
+                                  handleUpdateItem(row.id, "cessRate", matched.cessRate);
+                                }
+                              }
+                            }}
+                            placeholder="HSN / SAC"
+                            title={hsnValidation.isValid ? "HSN Compliant" : hsnValidation.warning}
+                            style={{
+                              width: "100%",
+                              padding: "6px 6px",
+                              borderRadius: "6px",
+                              border: hsnValidation.isValid ? "1px solid #cbd5e1" : "1px solid #ef4444",
+                              background: hsnValidation.isValid ? "#ffffff" : "#fef2f2",
+                              fontSize: "12px",
+                              fontFamily: "monospace"
+                            }}
+                          />
+                          {!hsnValidation.isValid && (
+                            <div style={{ fontSize: "9px", color: "#dc2626", marginTop: "2px", fontWeight: 600 }}>
+                              {hsnValidation.warning}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* Qty */}
@@ -1648,7 +1894,7 @@ export function CreateInvoiceScreen({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12px" }}>
             <div>
               <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                Amount Received (₹)
+                {currentCategoryConfig.isPurchase ? "Amount Paid to Vendor (₹)" : "Amount Received (₹)"}
               </label>
               <input
                 type="number"
@@ -1724,7 +1970,7 @@ export function CreateInvoiceScreen({
           {/* Notes & Terms Accordion */}
           <div style={{ marginTop: "16px" }}>
             <label style={{ display: "block", color: "#64748b", marginBottom: "4px", fontSize: "11px", fontWeight: 600 }}>
-              Invoice Notes & Bank Account Details printed on bill
+              Terms, Conditions & Bank Account Details
             </label>
             <textarea
               rows={2}
@@ -1753,7 +1999,7 @@ export function CreateInvoiceScreen({
           }}
         >
           <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-            Invoice Summary & Tax Breakup
+            {currentCategoryConfig.short} Summary & Tax Breakup
           </h3>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "9px", fontSize: "12px" }}>
@@ -1781,9 +2027,9 @@ export function CreateInvoiceScreen({
             <hr style={{ border: "none", borderTop: "1px dashed #e2e8f0", margin: "4px 0" }} />
 
             {/* GST Split: CGST + SGST or IGST */}
-            {invoiceType === "Bill of Supply" ? (
+            {invoiceType === "Bill of Supply" || docCategory === "Delivery Challan" ? (
               <div style={{ display: "flex", justifyContent: "space-between", color: "#b45309", fontSize: "11px" }}>
-                <span>Composition Tax (Nil on Bill of Supply):</span>
+                <span>Non-Taxable Supply (Nil GST):</span>
                 <span>₹0.00</span>
               </div>
             ) : isInterState ? (
@@ -1829,7 +2075,7 @@ export function CreateInvoiceScreen({
 
             {/* Grand Total */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>Invoice Grand Total:</span>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>Document Grand Total:</span>
               <span style={{ fontSize: "20px", fontWeight: 900, color: "#123b78" }}>
                 ₹{totals.grandTotal.toLocaleString("en-IN")}
               </span>
@@ -1850,10 +2096,10 @@ export function CreateInvoiceScreen({
             >
               <div>
                 <div style={{ fontSize: "11px", color: totals.balanceDue > 0 ? "#9a3412" : "#166534" }}>
-                  Received: ₹{Number(amountReceived).toLocaleString("en-IN")}
+                  {currentCategoryConfig.isPurchase ? "Paid: " : "Received: "}₹{Number(amountReceived).toLocaleString("en-IN")}
                 </div>
                 <div style={{ fontSize: "13px", fontWeight: 800, color: totals.balanceDue > 0 ? "#c2410c" : "#15803d" }}>
-                  {totals.balanceDue > 0 ? `Balance Due: ₹${totals.balanceDue.toLocaleString("en-IN")}` : "Full Payment Settled ✓"}
+                  {totals.balanceDue > 0 ? `Balance Due: ₹${totals.balanceDue.toLocaleString("en-IN")}` : "Fully Settled ✓"}
                 </div>
               </div>
               <span
@@ -1866,14 +2112,32 @@ export function CreateInvoiceScreen({
                   color: totals.balanceDue > 0 ? "#9a3412" : "#14532d"
                 }}
               >
-                {totals.balanceDue > 0 ? "Credit Sale" : "Paid"}
+                {totals.balanceDue > 0 ? (currentCategoryConfig.isPurchase ? "Credit Purchase" : "Credit Sale") : "Paid"}
               </span>
+            </div>
+            {/* Dynamic UPI Settlement Input */}
+            <div style={{ marginTop: "12px", padding: "10px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#1e293b" }}>Business UPI VPA (for QR Code):</span>
+                <span style={{ fontSize: "10px", color: "#1677e8", fontWeight: 600 }}>Active for Scan & Pay</span>
+              </div>
+              <input
+                value={payeeUpiVpa}
+                onChange={(e) => setPayeeUpiVpa(e.target.value)}
+                placeholder="merchant@okhdfcbank"
+                style={{
+                  width: "100%",
+                  padding: "5px 8px",
+                  borderRadius: "4px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "11px",
+                  fontFamily: "monospace"
+                }}
+              />
             </div>
           </div>
         </div>
       </div>
-
-      {/* ================= 5. PRODUCT SEARCH MODAL ================= */}
       {showProductSearchModal && (
         <div
           style={{
@@ -1981,7 +2245,7 @@ export function CreateInvoiceScreen({
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "14px", fontWeight: 800, color: "#123b78" }}>
-                        ₹{prod.rate.toLocaleString("en-IN")} / {prod.unit}
+                        ₹{(currentCategoryConfig.isPurchase && prod.purchaseRate ? prod.purchaseRate : prod.rate).toLocaleString("en-IN")} / {prod.unit}
                       </div>
                       <div style={{ fontSize: "11px", color: prod.inStock > 0 ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
                         {prod.inStock > 0 ? `Stock: ${prod.inStock} ${prod.unit}` : "Out of stock"}
@@ -2032,7 +2296,7 @@ export function CreateInvoiceScreen({
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <UserPlus size={18} style={{ color: "#16a34a" }} />
                 <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1e293b" }}>
-                  Quick Customer Creation
+                  Quick {currentCategoryConfig.isPurchase ? "Vendor" : "Customer"} Creation
                 </h3>
               </div>
               <button
@@ -2139,7 +2403,7 @@ export function CreateInvoiceScreen({
                     cursor: "pointer"
                   }}
                 >
-                  Save & Apply Customer
+                  Save & Apply Party
                 </button>
               </div>
             </div>
@@ -2187,7 +2451,7 @@ export function CreateInvoiceScreen({
             >
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#1e293b" }}>
-                  Instant GST Invoice Preview ({invoiceNo})
+                  Instant {currentCategoryConfig.label} Preview ({invoiceNo})
                 </span>
                 <div style={{ display: "flex", gap: "6px" }}>
                   <button
@@ -2307,9 +2571,11 @@ export function CreateInvoiceScreen({
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 900, color: "#1e293b" }}>{invoiceType}</div>
+                    <div style={{ fontSize: "20px", fontWeight: 900, color: "#1e293b" }}>
+                      {currentCategoryConfig.label.toUpperCase()}
+                    </div>
                     <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-                      Invoice No: <b>{invoiceNo}</b>
+                      Doc No: <b>{invoiceNo}</b>
                       <br />
                       Date: <b>{invoiceDate}</b> | Due: <b>{dueDate}</b>
                     </div>
@@ -2330,7 +2596,9 @@ export function CreateInvoiceScreen({
                   }}
                 >
                   <div>
-                    <span style={{ color: "#64748b", fontWeight: 700 }}>BILL TO:</span>
+                    <span style={{ color: "#64748b", fontWeight: 700 }}>
+                      {currentCategoryConfig.isPurchase ? "BILL FROM (SUPPLIER):" : "BILL TO (CUSTOMER):"}
+                    </span>
                     <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>
                       {customerName}
                     </div>
@@ -2394,12 +2662,39 @@ export function CreateInvoiceScreen({
                     paddingTop: "14px"
                   }}
                 >
-                  <div style={{ fontSize: "11px", color: "#64748b", maxWidth: "320px" }}>
+                  <div style={{ fontSize: "11px", color: "#64748b", maxWidth: "340px" }}>
                     <b>Bank Details for Settlement:</b>
                     <br />
                     Bank: HDFC Bank Limited | A/C: 50200012345678
                     <br />
-                    IFSC: HDFC0000123 | UPI: quantumgst@okhdfcbank
+                    IFSC: HDFC0000123 | UPI: {payeeUpiVpa}
+                    {upiQrDataUrl && (
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          background: "#f8fafc",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          border: "1px dashed #cbd5e1"
+                        }}
+                      >
+                        <img
+                          src={upiQrDataUrl}
+                          alt="Dynamic UPI QR"
+                          style={{ width: "64px", height: "64px", borderRadius: "4px" }}
+                        />
+                        <div style={{ fontSize: "10px", color: "#334155" }}>
+                          <span style={{ fontWeight: 800, color: "#0f172a" }}>Scan to Pay via UPI</span>
+                          <br />
+                          Amount: <b>₹{totals.grandTotal.toLocaleString("en-IN")}</b>
+                          <br />
+                          <span style={{ fontSize: "9px", color: "#64748b" }}>GPay / PhonePe / Paytm / BHIM</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div style={{ width: "240px", fontSize: "11px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
