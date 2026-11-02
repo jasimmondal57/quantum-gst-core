@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Search,
+  MessageSquare,
   Plus,
   Trash2,
   Printer,
@@ -654,6 +655,31 @@ export function CreateInvoiceScreen({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [items, customerName, totals]);
 
+
+  // One-Click WhatsApp Share (Vyapar Parity)
+  const handleShareWhatsApp = () => {
+    const cleanMobile = (customerMobile || "").replace(/[^0-9]/g, "");
+    const formattedPhone = cleanMobile.length === 10 ? "91" + cleanMobile : cleanMobile;
+    const msg = [
+      `*Invoice from ${tradeName || legalName || "QuantumGST"}*`,
+      `--------------------------------`,
+      `Doc No: *${invoiceNo}*`,
+      `Date: ${invoiceDate}`,
+      `Party: ${customerName}`,
+      `Total Amount: *₹${totals.grandTotal.toLocaleString("en-IN")}*`,
+      totals.balanceDue > 0 ? `Balance Due: *₹${totals.balanceDue.toLocaleString("en-IN")}*` : `Payment Status: *Fully Paid* ✓`,
+      ``,
+      `Pay securely via UPI: upi://pay?pa=${payeeUpiVpa}&pn=${encodeURIComponent(tradeName || "QuantumGST")}&am=${totals.grandTotal}&cu=INR`,
+      ``,
+      `Thank you for your business!`
+    ].join("\n");
+
+    const waUrl = formattedPhone 
+      ? `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, "_blank");
+  };
+
   // Save / Finalize Invoice Execution
   const handleSaveInvoice = async () => {
     if (!customerName.trim()) {
@@ -874,6 +900,27 @@ export function CreateInvoiceScreen({
           >
             <Eye size={15} style={{ color: "#1677e8" }} />
             Preview PDF
+          </button>
+
+          <button
+            onClick={handleShareWhatsApp}
+            title="Send Invoice & Payment Link via WhatsApp"
+            style={{
+              padding: "9px 15px",
+              borderRadius: "8px",
+              border: "1px solid #86efac",
+              background: "#f0fdf4",
+              color: "#15803d",
+              fontSize: "13px",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer"
+            }}
+          >
+            <MessageSquare size={15} style={{ color: "#16a34a" }} />
+            WhatsApp
           </button>
 
           <button
@@ -1594,6 +1641,8 @@ export function CreateInvoiceScreen({
                 <th style={{ padding: "10px 8px", width: "35px" }}>#</th>
                 <th style={{ padding: "10px 10px", minWidth: "220px" }}>Product / Item Name</th>
                 <th style={{ padding: "10px 8px", width: "95px" }}>HSN/SAC</th>
+                <th style={{ padding: "10px 8px", width: "85px" }}>Batch No</th>
+                <th style={{ padding: "10px 8px", width: "95px" }}>Exp Date</th>
                 <th style={{ padding: "10px 8px", width: "75px" }}>Qty</th>
                 <th style={{ padding: "10px 8px", width: "75px" }}>Unit</th>
                 <th style={{ padding: "10px 8px", width: "105px" }}>
@@ -1690,6 +1739,40 @@ export function CreateInvoiceScreen({
                         </div>
                       );
                     })()}
+                  </td>
+
+                  {/* Batch No */}
+                  <td style={{ padding: "10px 8px" }}>
+                    <input
+                      value={row.batchNo || ""}
+                      onChange={(e) => handleUpdateItem(row.id, "batchNo", e.target.value.toUpperCase())}
+                      placeholder="B-001"
+                      style={{
+                        width: "100%",
+                        padding: "6px 6px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "11px",
+                        fontFamily: "monospace"
+                      }}
+                    />
+                  </td>
+
+                  {/* Exp Date */}
+                  <td style={{ padding: "10px 8px" }}>
+                    <input
+                      type="text"
+                      value={row.expDate || ""}
+                      onChange={(e) => handleUpdateItem(row.id, "expDate", e.target.value)}
+                      placeholder="MM/YY"
+                      style={{
+                        width: "100%",
+                        padding: "6px 6px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "11px"
+                      }}
+                    />
                   </td>
 
                   {/* Qty */}
