@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
+use App\Http\Controllers\Api\CreditDebitNoteController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\GstinController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -55,11 +56,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
         Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf']);
 
+        // Statutory Credit & Debit Notes
+        Route::get('/credit-debit-notes', [CreditDebitNoteController::class, 'index']);
+        Route::post('/credit-debit-notes', [CreditDebitNoteController::class, 'store']);
+        Route::get('/credit-debit-notes/{id}', [CreditDebitNoteController::class, 'show']);
+        Route::get('/credit-debit-notes/{id}/pdf', [CreditDebitNoteController::class, 'downloadPdf']);
+
         // Marketplace Report Ingestion
         Route::post('/marketplace/import', [MarketplaceImportController::class, 'import']);
         Route::get('/marketplace/orders', [MarketplaceImportController::class, 'orders']);
 
         // GST Compliance & Statutory Reports
         Route::get('/reports/gstr1', [GstReportController::class, 'gstr1']);
+        Route::get('/reports/gstr3b', [GstReportController::class, 'gstr3b']);
     });
 });

@@ -69,4 +69,8 @@ quantum-gst-ui/
 *plan*.md
 *.plan.md
 *PLAN*.md
+*GAP*.md
+*gap*.md
+*audit*.md
+QUANTUM_GST_GAP_ANALYSIS.md
 menus.md
