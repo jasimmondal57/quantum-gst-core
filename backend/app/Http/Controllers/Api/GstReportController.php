@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\CreditDebitNote;
 use App\Models\Invoice;
 use App\Modules\GSTEngine\Services\GSTCalculationEngine;
+use App\Modules\GSTEngine\Services\Gstr2bReconciliationService;
+use App\Modules\GSTEngine\Services\Gstr9Generator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -364,5 +366,69 @@ class GstReportController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Statutory GSTR-2B Inward ITC Reconciliation against Books.
+     */
+    public function gstr2bReconcile(Request $request, Gstr2bReconciliationService $service)
+    {
+        $validated = $request->validate([
+            'business_id' => 'required|uuid|exists:businesses,id',
+            'return_period' => 'required|string|regex:/^\d{4}-\d{2}$/', // e.g. '2026-11'
+            'gstr2b_data' => 'required|array',
+        ]);
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $allowed = DB::table('businesses')
+                ->where('id', $validated['business_id'])
+                ->whereIn('organization_id', $userOrgIds)
+                ->exists();
+
+            if (!$allowed) {
+                return response()->json(['message' => 'Unauthorized: Business does not belong to your organization.'], 403);
+            }
+        }
+
+        $result = $service->reconcile(
+            businessId: $validated['business_id'],
+            returnPeriod: $validated['return_period'],
+            gstr2bData: $validated['gstr2b_data']
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Statutory GSTR-9 Annual Return Compilation.
+     */
+    public function gstr9(Request $request, Gstr9Generator $generator)
+    {
+        $validated = $request->validate([
+            'business_id' => 'required|uuid|exists:businesses,id',
+            'financial_year' => 'required|string|regex:/^\d{4}-\d{2}$/', // e.g. '2026-27'
+        ]);
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $allowed = DB::table('businesses')
+                ->where('id', $validated['business_id'])
+                ->whereIn('organization_id', $userOrgIds)
+                ->exists();
+
+            if (!$allowed) {
+                return response()->json(['message' => 'Unauthorized: Business does not belong to your organization.'], 403);
+            }
+        }
+
+        $result = $generator->generate(
+            businessId: $validated['business_id'],
+            financialYear: $validated['financial_year']
+        );
+
+        return response()->json($result);
     }
 }

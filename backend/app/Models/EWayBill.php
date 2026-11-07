@@ -92,3 +92,4 @@ class EWayBill extends Model
         return $this->belongsTo(StockTransfer::class);
     }
 }
+

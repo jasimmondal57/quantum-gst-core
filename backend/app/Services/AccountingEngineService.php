@@ -9,6 +9,7 @@ use App\Models\InvoiceSequence;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\PaymentVoucher;
+use App\Models\PurchaseBill;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -298,6 +299,115 @@ class AccountingEngineService
             lines: $lines,
             refType: 'invoice',
             refId: $invoice->id
+        );
+    }
+
+    /**
+     * Automatically post double-entry records for an Inward Purchase Bill.
+     */
+    public function postPurchaseBill(PurchaseBill $bill): JournalEntry
+    {
+        $bizId = $bill->business_id;
+        $this->ensureStandardChartOfAccounts($bizId);
+
+        $apAccount = $this->getAccount($bizId, '2010'); // Sundry Creditors
+        $purchasesAccount = $this->getAccount($bizId, '5010'); // Cost of Goods Sold / Purchases
+        $itcCgstAccount = $this->getAccount($bizId, '1040'); // ITC CGST
+        $itcSgstAccount = $this->getAccount($bizId, '1041'); // ITC SGST
+        $itcIgstAccount = $this->getAccount($bizId, '1042'); // ITC IGST
+        $itcCessAccount = $this->getAccount($bizId, '1043'); // ITC Cess
+        $roundOffAccount = $this->getAccount($bizId, '5090');
+
+        $lines = [];
+
+        // 1. Debit Purchases / COGS
+        $lines[] = [
+            'account_id' => $purchasesAccount->id,
+            'debit' => (string) $bill->total_taxable_value,
+            'credit' => '0.00',
+            'description' => "Purchase turnover for Bill #{$bill->bill_number}",
+        ];
+
+        // 2. Debit Input Tax Credit (ITC)
+        if (bccomp((string) $bill->total_cgst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $itcCgstAccount->id,
+                'debit' => (string) $bill->total_cgst,
+                'credit' => '0.00',
+                'description' => 'Input Tax Credit - CGST',
+            ];
+        }
+
+        if (bccomp((string) $bill->total_sgst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $itcSgstAccount->id,
+                'debit' => (string) $bill->total_sgst,
+                'credit' => '0.00',
+                'description' => 'Input Tax Credit - SGST/UTGST',
+            ];
+        }
+
+        if (bccomp((string) $bill->total_igst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $itcIgstAccount->id,
+                'debit' => (string) $bill->total_igst,
+                'credit' => '0.00',
+                'description' => 'Input Tax Credit - IGST',
+            ];
+        }
+
+        if (bccomp((string) ($bill->total_cess ?? '0.00'), '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $itcCessAccount->id,
+                'debit' => (string) $bill->total_cess,
+                'credit' => '0.00',
+                'description' => 'Input Tax Credit - GST Cess',
+            ];
+        }
+
+        // 3. Credit Sundry Creditors (Accounts Payable)
+        $lines[] = [
+            'account_id' => $apAccount->id,
+            'party_type' => 'supplier',
+            'party_id' => $bill->supplier_id,
+            'debit' => '0.00',
+            'credit' => (string) $bill->grand_total,
+            'description' => "Purchase Bill #{$bill->bill_number} inward liability",
+        ];
+
+        // 4. Exact Double-Entry Balance Calculation for Rounding Off
+        $currentDebits = '0.00';
+        $currentCredits = (string) $bill->grand_total;
+        foreach ($lines as $l) {
+            $currentDebits = bcadd($currentDebits, (string) $l['debit'], 2);
+        }
+
+        $diff = bcsub($currentCredits, $currentDebits, 2);
+        if (bccomp($diff, '0.00', 2) > 0) {
+            // Need more debit to balance grand total
+            $lines[] = [
+                'account_id' => $roundOffAccount->id,
+                'debit' => $diff,
+                'credit' => '0.00',
+                'description' => 'Purchase rounding off adjustment',
+            ];
+        } elseif (bccomp($diff, '0.00', 2) < 0) {
+            // Need more credit to balance grand total
+            $lines[] = [
+                'account_id' => $roundOffAccount->id,
+                'debit' => '0.00',
+                'credit' => bcsub('0.00', $diff, 2),
+                'description' => 'Purchase rounding off adjustment',
+            ];
+        }
+
+        return $this->postJournalEntry(
+            businessId: $bizId,
+            entryDate: Carbon::parse($bill->bill_date)->format('Y-m-d'),
+            narration: "Inward Purchase Bill #{$bill->bill_number} booked",
+            lines: $lines,
+            refType: 'purchase_bill',
+            refId: $bill->id
         );
     }
 

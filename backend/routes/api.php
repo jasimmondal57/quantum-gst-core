@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ManufacturingController;
 use App\Http\Controllers\Api\MarketplaceImportController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ShopifyController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,6 +67,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/credit-debit-notes/{id}', [CreditDebitNoteController::class, 'show']);
         Route::get('/credit-debit-notes/{id}/pdf', [CreditDebitNoteController::class, 'downloadPdf']);
 
+        // Inward Purchases & ITC Ledger
+        Route::get('/purchases', [PurchaseController::class, 'index']);
+        Route::post('/purchases', [PurchaseController::class, 'store']);
+        Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
+
         // Marketplace Report Ingestion
         Route::post('/marketplace/import', [MarketplaceImportController::class, 'import']);
         Route::get('/marketplace/orders', [MarketplaceImportController::class, 'orders']);
@@ -74,6 +80,8 @@ Route::prefix('v1')->group(function () {
         // GST Compliance & Statutory Reports
         Route::get('/reports/gstr1', [GstReportController::class, 'gstr1']);
         Route::get('/reports/gstr3b', [GstReportController::class, 'gstr3b']);
+        Route::post('/reports/gstr2b-reconcile', [GstReportController::class, 'gstr2bReconcile']);
+        Route::get('/reports/gstr9', [GstReportController::class, 'gstr9']);
 
         // Double-Entry Accounting & Financial Statements
         Route::prefix('accounting')->group(function () {

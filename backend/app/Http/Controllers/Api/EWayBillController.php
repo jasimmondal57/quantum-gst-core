@@ -171,3 +171,4 @@ class EWayBillController extends Controller
         return response()->json($cancelled);
     }
 }
+
