@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CreditDebitNoteController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\EInvoiceController;
+use App\Http\Controllers\Api\EWayBillController;
 use App\Http\Controllers\Api\GstinController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\GstReportController;
@@ -101,6 +103,23 @@ Route::prefix('v1')->group(function () {
             Route::post('/production-orders/{id}/complete', [ManufacturingController::class, 'completeProductionOrder']);
             Route::get('/stock-transfers', [ManufacturingController::class, 'stockTransfers']);
             Route::post('/stock-transfers', [ManufacturingController::class, 'storeStockTransfer']);
+        });
+
+        // Statutory e-Invoicing (IRN & Signed QR Code - Rule 48(4))
+        Route::prefix('einvoice')->group(function () {
+            Route::post('/generate', [EInvoiceController::class, 'generate']);
+            Route::get('/{id}/json', [EInvoiceController::class, 'jsonSchema']);
+            Route::post('/{id}/cancel', [EInvoiceController::class, 'cancel']);
+        });
+
+        // Statutory E-Way Bills (Rule 138)
+        Route::prefix('eway')->group(function () {
+            Route::get('/', [EWayBillController::class, 'index']);
+            Route::post('/generate', [EWayBillController::class, 'generateForInvoice']);
+            Route::post('/generate-transfer', [EWayBillController::class, 'generateForStockTransfer']);
+            Route::get('/{id}', [EWayBillController::class, 'show']);
+            Route::post('/{id}/update-vehicle', [EWayBillController::class, 'updateVehicle']);
+            Route::post('/{id}/cancel', [EWayBillController::class, 'cancel']);
         });
     });
 });

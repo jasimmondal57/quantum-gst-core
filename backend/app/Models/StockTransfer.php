@@ -45,3 +45,4 @@ class StockTransfer extends Model
         return $this->hasMany(StockTransferItem::class, 'stock_transfer_id');
     }
 }
+

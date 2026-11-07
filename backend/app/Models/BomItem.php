@@ -35,3 +35,4 @@ class BomItem extends Model
         return $this->belongsTo(Product::class, 'raw_material_id');
     }
 }
+

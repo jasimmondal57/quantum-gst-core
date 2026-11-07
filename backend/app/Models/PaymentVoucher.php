@@ -47,3 +47,4 @@ class PaymentVoucher extends Model
         return $this->belongsTo(Account::class, 'party_account_id');
     }
 }
+

@@ -71,3 +71,4 @@ class ProductionOrder extends Model
         return $this->hasMany(ProductionOrderItem::class, 'production_order_id');
     }
 }
+

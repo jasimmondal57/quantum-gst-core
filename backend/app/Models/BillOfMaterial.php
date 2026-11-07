@@ -46,3 +46,4 @@ class BillOfMaterial extends Model
         return $this->hasMany(BomItem::class, 'bom_id');
     }
 }
+

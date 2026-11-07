@@ -42,3 +42,4 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 EXPOSE 9000
 
 CMD ["php-fpm"]
+

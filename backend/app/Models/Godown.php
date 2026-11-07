@@ -37,3 +37,4 @@ class Godown extends Model
         return $this->hasMany(StockBalance::class);
     }
 }
+

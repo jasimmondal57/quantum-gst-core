@@ -203,3 +203,4 @@ class MarketplaceHardeningTest extends TestCase
         $validRes->assertStatus(201);
     }
 }
+

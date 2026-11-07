@@ -332,3 +332,4 @@ class ManufacturingController extends Controller
         return response()->json($transfer, 201);
     }
 }
+

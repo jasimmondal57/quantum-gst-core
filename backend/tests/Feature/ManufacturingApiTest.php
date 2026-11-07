@@ -279,3 +279,4 @@ class ManufacturingApiTest extends TestCase
         $this->assertEquals('50.0000', $destBal->quantity);
     }
 }
+
