@@ -14,6 +14,7 @@ class Invoice extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'invoice_date' => 'date',
         'is_interstate' => 'boolean',
         'reverse_charge' => 'boolean',
         'source_metadata' => 'array',

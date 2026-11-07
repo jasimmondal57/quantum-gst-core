@@ -52,3 +52,4 @@ class CreditDebitNote extends Model
         return $this->belongsTo(Invoice::class, 'original_invoice_id');
     }
 }
+

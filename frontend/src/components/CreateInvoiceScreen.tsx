@@ -52,6 +52,11 @@ export interface CreateInvoiceProps {
   activeBusinessId: string | null;
   activeOrgId: string | null;
   activeGstinId: string | null;
+  bankName?: string;
+  bankAccountNo?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  payeeUpi?: string;
   onInvoiceCreated?: () => void;
   onPreview?: () => void;
 }
@@ -296,6 +301,11 @@ export function CreateInvoiceScreen({
   activeBusinessId,
   activeOrgId,
   activeGstinId,
+  bankName: propBankName,
+  bankAccountNo: propBankAccountNo,
+  bankIfsc: propBankIfsc,
+  bankBranch: propBankBranch,
+  payeeUpi: propPayeeUpi,
   onInvoiceCreated,
   onPreview
 }: CreateInvoiceProps) {
@@ -395,12 +405,18 @@ export function CreateInvoiceScreen({
   const [paymentRefNo, setPaymentRefNo] = useState("");
   const [notes, setNotes] = useState("Thank you for your business! Please settle outstanding balances within 15 days.");
 
+  // Company Bank & Payment Details
+  const bankName = propBankName || localStorage.getItem("quantum_bank_name") || "State Bank of India";
+  const bankAccountNo = propBankAccountNo || localStorage.getItem("quantum_bank_account") || "38920192837";
+  const bankIfsc = propBankIfsc || localStorage.getItem("quantum_bank_ifsc") || "SBIN0001234";
+  const bankBranch = propBankBranch || localStorage.getItem("quantum_bank_branch") || "Main Commercial Branch";
+
   // Save State & Instant Modal Preview
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showInstantPdfModal, setShowInstantPdfModal] = useState(false);
   const [pdfTemplate, setPdfTemplate] = useState<"modern-a4" | "compact-a5" | "thermal-pos">("modern-a4");
-  const [payeeUpiVpa, setPayeeUpiVpa] = useState("quantumgst@okhdfcbank");
+  const [payeeUpiVpa, setPayeeUpiVpa] = useState(() => propPayeeUpi || localStorage.getItem("quantum_upi_id") || "quantumgst@okhdfcbank");
   const [upiQrDataUrl, setUpiQrDataUrl] = useState<string>("");
   const [isExport, setIsExport] = useState(false);
   const [exportType, setExportType] = useState<"LUT" | "IGST">("LUT");
@@ -2748,9 +2764,9 @@ export function CreateInvoiceScreen({
                   <div style={{ fontSize: "11px", color: "#64748b", maxWidth: "340px" }}>
                     <b>Bank Details for Settlement:</b>
                     <br />
-                    Bank: HDFC Bank Limited | A/C: 50200012345678
+                    Bank: {bankName} | A/C: {bankAccountNo}
                     <br />
-                    IFSC: HDFC0000123 | UPI: {payeeUpiVpa}
+                    IFSC: {bankIfsc} {bankBranch ? `(${bankBranch})` : ""} | UPI: {payeeUpiVpa}
                     {upiQrDataUrl && (
                       <div
                         style={{

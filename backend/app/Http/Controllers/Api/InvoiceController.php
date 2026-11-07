@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceSequence;
 use App\Modules\GSTEngine\Services\GSTCalculationEngine;
+use App\Services\AccountingEngineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +16,12 @@ use Illuminate\Support\Facades\DB;
 class InvoiceController extends Controller
 {
     protected GSTCalculationEngine $gstEngine;
+    protected AccountingEngineService $accountingService;
 
-    public function __construct(GSTCalculationEngine $gstEngine)
+    public function __construct(GSTCalculationEngine $gstEngine, AccountingEngineService $accountingService)
     {
         $this->gstEngine = $gstEngine;
+        $this->accountingService = $accountingService;
     }
 
     /**
@@ -224,6 +227,9 @@ class InvoiceController extends Controller
                     'total_amount' => $calcItem['item_total'],
                 ]);
             }
+
+            // 6. Automatically post double-entry ledger records
+            $this->accountingService->postInvoice($invoice);
 
             return response()->json($invoice->load('items', 'customer'), 201);
         });

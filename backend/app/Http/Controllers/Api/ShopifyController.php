@@ -11,26 +11,50 @@ use App\Models\InvoiceItem;
 use App\Models\InvoiceSequence;
 use App\Modules\GSTEngine\Services\GSTCalculationEngine;
 use App\Modules\Shopify\Services\ShopifyGstBridge;
+use App\Services\AccountingEngineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ShopifyController extends Controller
 {
     protected ShopifyGstBridge $bridge;
     protected GSTCalculationEngine $gstEngine;
+    protected AccountingEngineService $accountingService;
 
-    public function __construct(ShopifyGstBridge $bridge, GSTCalculationEngine $gstEngine)
-    {
+    public function __construct(
+        ShopifyGstBridge $bridge,
+        GSTCalculationEngine $gstEngine,
+        AccountingEngineService $accountingService
+    ) {
         $this->bridge = $bridge;
         $this->gstEngine = $gstEngine;
+        $this->accountingService = $accountingService;
     }
 
     /**
-     * Handle Shopify orders/create webhook for automatic GST tax invoice generation.
+     * Handle Shopify orders/create webhook with HMAC verification and idempotency protection.
      */
     public function handleOrderWebhook(Request $request)
     {
+        // 1. Shopify HMAC SHA256 Signature Verification
+        $secret = config('services.shopify.webhook_secret') ?? env('SHOPIFY_WEBHOOK_SECRET');
+        $hmacHeader = $request->header('X-Shopify-Hmac-Sha256');
+
+        if (!empty($secret) && !empty($hmacHeader)) {
+            $rawPayload = $request->getContent();
+            $calculatedHmac = base64_encode(hash_hmac('sha256', $rawPayload, $secret, true));
+
+            if (!hash_equals($hmacHeader, $calculatedHmac)) {
+                Log::warning('Shopify webhook HMAC mismatch', [
+                    'received_hmac' => $hmacHeader,
+                    'calculated_hmac' => $calculatedHmac,
+                ]);
+                return response()->json(['error' => 'Invalid webhook signature.'], 401);
+            }
+        }
+
         $businessId = $request->query('business_id');
         $business = Business::with('gstins')->find($businessId);
 
@@ -43,6 +67,23 @@ class ShopifyController extends Controller
 
         $payload = $request->all();
         $normalized = $this->bridge->normalizeShopifyOrder($payload);
+
+        // 2. Replay Protection & Idempotency: Avoid duplicate invoices for identical Shopify order IDs
+        $existingInvoice = Invoice::where('business_id', $business->id)
+            ->where('external_reference_id', (string) $normalized['shopify_order_id'])
+            ->first();
+
+        if ($existingInvoice) {
+            return response()->json([
+                'success' => true,
+                'idempotent' => true,
+                'message' => 'Shopify order already processed.',
+                'invoice_id' => $existingInvoice->id,
+                'invoice_number' => $existingInvoice->invoice_number,
+                'grand_total' => $existingInvoice->grand_total,
+                'pdf_url' => url("/api/v1/invoices/{$existingInvoice->id}/pdf"),
+            ], 200);
+        }
 
         return DB::transaction(function () use ($business, $normalized) {
             $gstin = $business->gstins->firstWhere('is_primary', true) ?? $business->gstins->first();
@@ -129,7 +170,7 @@ class ShopifyController extends Controller
                 'round_off' => $totals['round_off'],
                 'grand_total' => $totals['grand_total'],
                 'source' => 'shopify',
-                'external_reference_id' => $normalized['shopify_order_id'],
+                'external_reference_id' => (string) $normalized['shopify_order_id'],
                 'source_metadata' => [
                     'order_number' => $normalized['order_number'],
                 ],
@@ -153,6 +194,9 @@ class ShopifyController extends Controller
                     'total_amount' => $calcItem['item_total'],
                 ]);
             }
+
+            // Auto-post double entry in General Ledger
+            $this->accountingService->postInvoice($invoice);
 
             return response()->json([
                 'success' => true,

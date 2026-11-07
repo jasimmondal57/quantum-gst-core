@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AccountingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CreditDebitNoteController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\GstinController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\GstReportController;
+use App\Http\Controllers\Api\ManufacturingController;
 use App\Http\Controllers\Api\MarketplaceImportController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
@@ -65,9 +67,40 @@ Route::prefix('v1')->group(function () {
         // Marketplace Report Ingestion
         Route::post('/marketplace/import', [MarketplaceImportController::class, 'import']);
         Route::get('/marketplace/orders', [MarketplaceImportController::class, 'orders']);
+        Route::get('/marketplace/reconciliation', [MarketplaceImportController::class, 'reconciliation']);
 
         // GST Compliance & Statutory Reports
         Route::get('/reports/gstr1', [GstReportController::class, 'gstr1']);
         Route::get('/reports/gstr3b', [GstReportController::class, 'gstr3b']);
+
+        // Double-Entry Accounting & Financial Statements
+        Route::prefix('accounting')->group(function () {
+            Route::get('/accounts', [AccountingController::class, 'accounts']);
+            Route::post('/accounts', [AccountingController::class, 'storeAccount']);
+            Route::get('/journal-entries', [AccountingController::class, 'journalEntries']);
+            Route::post('/journal-entries', [AccountingController::class, 'postJournalEntry']);
+            Route::get('/payments', [AccountingController::class, 'paymentVouchers']);
+            Route::post('/payments', [AccountingController::class, 'storePaymentVoucher']);
+            Route::get('/trial-balance', [AccountingController::class, 'trialBalance']);
+            Route::get('/profit-loss', [AccountingController::class, 'profitLoss']);
+            Route::get('/balance-sheet', [AccountingController::class, 'balanceSheet']);
+            Route::get('/ledgers', [AccountingController::class, 'partyLedger']);
+        });
+
+        // Manufacturing, BOM, Production Orders & Godowns
+        Route::prefix('manufacturing')->group(function () {
+            Route::get('/godowns', [ManufacturingController::class, 'godowns']);
+            Route::post('/godowns', [ManufacturingController::class, 'storeGodown']);
+            Route::get('/godowns/{id}/stock', [ManufacturingController::class, 'godownStock']);
+            Route::get('/boms', [ManufacturingController::class, 'boms']);
+            Route::post('/boms', [ManufacturingController::class, 'storeBom']);
+            Route::get('/boms/{id}/costing', [ManufacturingController::class, 'bomCosting']);
+            Route::get('/production-orders', [ManufacturingController::class, 'productionOrders']);
+            Route::post('/production-orders', [ManufacturingController::class, 'storeProductionOrder']);
+            Route::post('/production-orders/{id}/start', [ManufacturingController::class, 'startProductionOrder']);
+            Route::post('/production-orders/{id}/complete', [ManufacturingController::class, 'completeProductionOrder']);
+            Route::get('/stock-transfers', [ManufacturingController::class, 'stockTransfers']);
+            Route::post('/stock-transfers', [ManufacturingController::class, 'storeStockTransfer']);
+        });
     });
 });

@@ -213,8 +213,10 @@ class GSTCalculationEngine
             $totalIgst = bcadd($totalIgst, (string) ($item['igst_amount'] ?? '0.00'), 2);
             $totalCess = bcadd($totalCess, (string) ($item['cess_amount'] ?? '0.00'), 2);
             $totalTax = bcadd($totalTax, (string) ($item['total_tax'] ?? '0.00'), 2);
-            $subTotal = bcadd($subTotal, (string) ($item['item_total'] ?? '0.00'), 2);
         }
+
+        // Subtotal is strictly the sum of taxable base and taxes
+        $subTotal = bcadd($totalTaxable, $totalTax, 2);
 
         // Standard Indian statutory invoice rounding to nearest whole rupee
         $wholeRupee = round((float) $subTotal);

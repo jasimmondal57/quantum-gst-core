@@ -123,3 +123,4 @@ class GSTCalculationEngineTest extends TestCase
         $this->assertEquals('100.00', $taxable);
     }
 }
+

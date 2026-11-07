@@ -9,8 +9,21 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secretpassword}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backups/postgres:/backups
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432" # Securely bound to localhost only
+    networks:
+      - quantum_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quantum_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - quantum_network
 
   backend:
     build:
@@ -28,10 +41,43 @@ services:
       DB_DATABASE: ${DB_DATABASE:-quantumgst}
       DB_USERNAME: ${DB_USERNAME:-quantumgst_user}
       DB_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
     depends_on:
       - postgres
+      - redis
     volumes:
       - ./backend/storage:/var/www/html/storage
+    networks:
+      - quantum_network
+
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: quantum_queue_worker
+    restart: unless-stopped
+    command: php artisan queue:work redis --tries=3 --timeout=90
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-quantumgst}
+      DB_USERNAME: ${DB_USERNAME:-quantumgst_user}
+      DB_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+    depends_on:
+      - backend
+      - postgres
+      - redis
+    networks:
+      - quantum_network
 
   frontend:
     build:
@@ -41,8 +87,16 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       - backend
+    networks:
+      - quantum_network
 
 volumes:
   postgres_data:
+  redis_data:
+
+networks:
+  quantum_network:
+    driver: bridge

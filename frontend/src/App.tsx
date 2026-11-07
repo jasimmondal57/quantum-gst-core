@@ -2332,6 +2332,11 @@ export function App() {
         activeBusinessId={activeBusinessId}
         activeOrgId={activeOrgId}
         activeGstinId={activeGstinId}
+        bankName={bankName}
+        bankAccountNo={accountNumber}
+        bankIfsc={ifscCode}
+        bankBranch={branchName}
+        payeeUpi={upiId}
         onInvoiceCreated={refreshCloudData}
         onPreview={() => setPage("InvoicePreview")}
       />

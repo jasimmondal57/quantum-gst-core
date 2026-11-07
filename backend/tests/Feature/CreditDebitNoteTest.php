@@ -90,3 +90,4 @@ class CreditDebitNoteTest extends TestCase
         ]);
     }
 }
+

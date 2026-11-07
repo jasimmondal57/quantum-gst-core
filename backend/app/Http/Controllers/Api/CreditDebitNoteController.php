@@ -7,12 +7,19 @@ use App\Models\BusinessGstin;
 use App\Models\CreditDebitNote;
 use App\Models\Invoice;
 use App\Models\InvoiceSequence;
+use App\Services\AccountingEngineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CreditDebitNoteController extends Controller
 {
+    protected AccountingEngineService $accountingService;
+
+    public function __construct(AccountingEngineService $accountingService)
+    {
+        $this->accountingService = $accountingService;
+    }
     /**
      * Statutory GSTN Reason Codes for Credit/Debit Notes.
      */
@@ -152,6 +159,11 @@ class CreditDebitNoteController extends Controller
                 'total_amount' => $totalAmount,
                 'status' => 'finalized',
             ]);
+
+            // Automatically post double-entry ledger reversal records
+            if ($note->note_type === 'credit_note') {
+                $this->accountingService->postCreditNote($note);
+            }
 
             return response()->json($note->load(['originalInvoice.customer', 'businessGstin']), 201);
         });
