@@ -29,6 +29,8 @@ export interface Customer {
   id: string;
   business_id: string;
   name: string;
+  company_name?: string;
+  customer_type?: string;
   gstin?: string;
   state_code: string;
   state_name: string;
@@ -71,6 +73,42 @@ export interface Invoice {
   grand_total: string;
   customer?: Customer;
   items?: InvoiceItem[];
+  irn?: string;
+  ack_no?: string;
+  ack_date?: string;
+  signed_qr_code?: string;
+  einvoice_status?: string;
+}
+
+export interface PurchaseBill {
+  id: string;
+  bill_number: string;
+  bill_date: string;
+  due_date?: string;
+  supplier?: Customer;
+  place_of_supply_state_code: string;
+  total_taxable_value: string;
+  total_cgst: string;
+  total_sgst: string;
+  total_igst: string;
+  total_tax_amount: string;
+  grand_total: string;
+  status: string;
+  itc_eligibility?: string;
+  items?: any[];
+}
+
+export interface EWayBill {
+  id: string;
+  eway_bill_number: string;
+  eway_bill_date: string;
+  valid_until: string;
+  doc_type: string;
+  doc_number: string;
+  vehicle_number?: string;
+  distance_km: number;
+  status: string;
+  qr_code?: string;
 }
 
 const API_BASE =
@@ -300,6 +338,102 @@ class QuantumApiClient {
       headers: this.getHeaders()
     });
     return res.json();
+  }
+
+  // Statutory E-Invoice & E-Way Bill Methods
+  async generateEInvoice(invoiceId: string) {
+    const res = await fetch(`${API_BASE}/einvoice/generate`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ invoice_id: invoiceId })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to generate e-Invoice IRN");
+    }
+    return json;
+  }
+
+  async cancelEInvoice(invoiceId: string, reason: string = "Data entry error") {
+    const res = await fetch(`${API_BASE}/einvoice/cancel`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ invoice_id: invoiceId, cancel_reason: reason })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to cancel e-Invoice");
+    }
+    return json;
+  }
+
+  async generateEWayBill(data: {
+    invoice_id: string;
+    distance_km: number;
+    vehicle_number?: string;
+    transport_mode?: string;
+    transporter_name?: string;
+  }) {
+    const res = await fetch(`${API_BASE}/eway/generate-invoice`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to generate e-Way Bill");
+    }
+    return json;
+  }
+
+  async fetchEWayBills(businessId: string): Promise<{ data: EWayBill[] }> {
+    const res = await fetch(`${API_BASE}/eway?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
+  // Purchases & GSTR-2B
+  async fetchPurchases(businessId: string): Promise<{ data: PurchaseBill[] }> {
+    const res = await fetch(`${API_BASE}/purchases?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
+  async createPurchase(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/purchases`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to record purchase bill");
+    }
+    return json;
+  }
+
+  async reconcileGstr2b(businessId: string, returnPeriod: string, gstr2bData: any) {
+    const res = await fetch(`${API_BASE}/reports/gstr2b-reconcile`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        business_id: businessId,
+        return_period: returnPeriod,
+        gstr2b_data: gstr2bData
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to reconcile GSTR-2B");
+    }
+    return json;
+  }
+
+  getTallyXmlExportUrl(businessId: string, type: "all" | "masters" | "vouchers" = "all"): string {
+    const activeToken = this.getToken();
+    return `${API_BASE}/export/tally-xml?business_id=${businessId}&type=${type}&token=${activeToken || ""}`;
   }
 
   async checkLatestAppVersion(): Promise<{ hasUpdate: boolean; latestVersion: string; currentVersion: string; releaseUrl: string }> {

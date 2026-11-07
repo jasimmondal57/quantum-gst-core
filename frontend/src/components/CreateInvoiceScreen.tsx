@@ -710,23 +710,70 @@ export function CreateInvoiceScreen({
     setIsSaving(true);
     try {
       if (activeBusinessId && activeOrgId && activeGstinId) {
-        await api.createInvoice({
-          organization_id: activeOrgId,
-          business_id: activeBusinessId,
-          business_gstin_id: activeGstinId,
-          invoice_date: invoiceDate,
-          place_of_supply_state_code: placeOfSupplyCode,
-          reverse_charge: reverseCharge,
-          items: lineCalculations.map((it) => ({
-            item_name: it.name,
-            hsn_sac: it.hsn,
-            quantity: it.qty,
-            unit: it.unit,
-            unit_price: it.rate,
-            discount_amount: it.discount,
-            gst_rate: it.gstRate
-          }))
-        });
+        if (docCategory === "Purchase Bill") {
+          let partyId = customerId;
+          if (!partyId) {
+            try {
+              const partyRes = await api.createCustomer({
+                business_id: activeBusinessId,
+                customer_type: "supplier",
+                name: customerName,
+                company_name: customerName,
+                gstin: customerGstin ? customerGstin.toUpperCase() : undefined,
+                phone: customerMobile || undefined,
+                state_code: placeOfSupplyCode,
+                state_name: stateName || "Maharashtra",
+                billing_address: billingAddress || undefined,
+              });
+              if (partyRes && partyRes.id) partyId = partyRes.id;
+            } catch {
+              // fallback
+            }
+          }
+
+          if (partyId) {
+            await api.createPurchase({
+              business_id: activeBusinessId,
+              business_gstin_id: activeGstinId,
+              supplier_id: partyId,
+              bill_number: invoiceNo,
+              bill_date: invoiceDate,
+              place_of_supply_state_code: placeOfSupplyCode,
+              reverse_charge: reverseCharge,
+              itc_eligibility: "inputs",
+              notes: notes || undefined,
+              items: lineCalculations.map((it) => ({
+                product_id: it.productId || undefined,
+                item_name: it.name,
+                hsn_sac: it.hsn,
+                quantity: it.qty,
+                unit: it.unit,
+                unit_price: it.rate,
+                discount_amount: it.discount,
+                gst_rate: it.gstRate,
+              })),
+            });
+          }
+        } else {
+          await api.createInvoice({
+            organization_id: activeOrgId,
+            business_id: activeBusinessId,
+            business_gstin_id: activeGstinId,
+            invoice_date: invoiceDate,
+            place_of_supply_state_code: placeOfSupplyCode,
+            reverse_charge: reverseCharge,
+            items: lineCalculations.map((it) => ({
+              product_id: it.productId || undefined,
+              item_name: it.name,
+              hsn_sac: it.hsn,
+              quantity: it.qty,
+              unit: it.unit,
+              unit_price: it.rate,
+              discount_amount: it.discount,
+              gst_rate: it.gstRate
+            }))
+          });
+        }
       }
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 4000);

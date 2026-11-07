@@ -27,6 +27,27 @@ export function buildUpiUri(params: DynamicUpiParams): string {
 }
 
 /**
+ * Generates Base64 Data URL for any arbitrary text (e.g., e-Invoice signed QR, e-Way Bill QR)
+ */
+export async function generateQrDataUrl(text: string): Promise<string> {
+  if (!text) return "";
+  try {
+    return await QRCode.toDataURL(text, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: "#0f172a",
+        light: "#ffffff"
+      },
+      errorCorrectionLevel: "M"
+    });
+  } catch (err) {
+    console.error("Failed to generate QR Code", err);
+    return "";
+  }
+}
+
+/**
  * Generates Base64 Data URL for QR Code image
  */
 export async function generateUpiQrDataUrl(params: DynamicUpiParams): Promise<string> {

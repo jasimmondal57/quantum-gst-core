@@ -24,7 +24,7 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'business_id' => 'required|uuid|exists:businesses,id',
-            'customer_type' => 'required|string|in:b2b,b2c,export,sez',
+            'customer_type' => 'required|string|in:b2b,b2c,export,sez,supplier',
             'name' => 'required|string|max:255',
             'company_name' => 'nullable|string|max:255',
             'gstin' => 'nullable|string|size:15',

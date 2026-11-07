@@ -56,7 +56,8 @@ import {
 import { AuthScreen } from "./components/AuthScreen";
 import { CreateInvoiceScreen } from "./components/CreateInvoiceScreen";
 import { api } from "./services/api";
-import type { Invoice, Customer, BusinessProfile } from "./services/api";
+import type { Invoice, Customer, BusinessProfile, EWayBill, PurchaseBill } from "./services/api";
+import { generateQrDataUrl } from "./utils/upiQr";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -361,14 +362,21 @@ export const navGroups = [
 function Btn({
   children,
   secondary = false,
+  disabled = false,
   onClick
 }: {
   children: React.ReactNode;
   secondary?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <button onClick={onClick} className={secondary ? "btn secondary" : "btn"}>
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={secondary ? "btn secondary" : "btn"}
+      style={disabled ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+    >
       {children}
     </button>
   );
@@ -457,7 +465,7 @@ function Table({
 }: {
   headers: string[];
   rows: string[][];
-  onAction?: (action: string, row: string[]) => void;
+  onAction?: (action: string, row: string[], index: number) => void;
 }) {
   return (
     <div className="tablewrap">
@@ -474,12 +482,12 @@ function Table({
             <tr key={i}>
               {r.map((v, j) => (
                 <td key={j}>
-                  {["Imported", "Paid", "Matched", "Enabled"].includes(v) ? (
+                  {["Imported", "Paid", "Matched", "Enabled", "Generated", "Active"].includes(v) ? (
                     <span className="good">{v}</span>
-                  ) : ["Pending", "Unmatched", "Mismatch"].includes(v) ? (
+                  ) : ["Pending", "Unmatched", "Mismatch", "Cancelled"].includes(v) ? (
                     <span className="warn">{v}</span>
-                  ) : v === "View" || v === "Edit" || v === "Import" ? (
-                    <a onClick={() => onAction && onAction(v, r)}>{v}</a>
+                  ) : v === "View" || v === "Edit" || v === "Import" || v === "Generate IRN" || v === "E-Way Bill" ? (
+                    <a onClick={() => onAction && onAction(v, r, i)}>{v}</a>
                   ) : (
                     v
                   )}
@@ -521,6 +529,20 @@ export function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>("Synced with Cloud");
   const [cloudInvoices, setCloudInvoices] = useState<Invoice[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [cloudEWayBills, setCloudEWayBills] = useState<EWayBill[]>([]);
+  const [cloudPurchases, setCloudPurchases] = useState<PurchaseBill[]>([]);
+  const [showEwayModal, setShowEwayModal] = useState<boolean>(false);
+  const [ewayModalInvoice, setEwayModalInvoice] = useState<Invoice | null>(null);
+  const [ewayDistance, setEwayDistance] = useState<number>(100);
+  const [ewayVehicleNo, setEwayVehicleNo] = useState<string>("WB-19-AB-4521");
+  const [ewayTransportMode, setEwayTransportMode] = useState<string>("road");
+  const [ewayTransporter, setEwayTransporter] = useState<string>("V-Trans Logistics");
+  const [isGeneratingEway, setIsGeneratingEway] = useState<boolean>(false);
+  const [isGeneratingIrn, setIsGeneratingIrn] = useState<boolean>(false);
+  const [irnQrDataUrl, setIrnQrDataUrl] = useState<string>("");
+  const [gstr2bReconcileResult, setGstr2bReconcileResult] = useState<any | null>(null);
+  const [isReconcilingGstr2b, setIsReconcilingGstr2b] = useState<boolean>(false);
   const [activeBusinessId, setActiveBusinessId] = useState<string>("");
   const [activeOrgId, setActiveOrgId] = useState<string>("");
   const [activeGstinId, setActiveGstinId] = useState<string>("");
@@ -1133,6 +1155,121 @@ export function App() {
     window.location.reload();
   };
 
+  const handleGenerateIrn = async (inv: Invoice) => {
+    setIsGeneratingIrn(true);
+    try {
+      const res = await api.generateEInvoice(inv.id);
+      if (res && res.success) {
+        alert(`e-Invoice IRN successfully registered!\nIRN: ${res.irn}\nAck No: ${res.ack_no}`);
+        const updated = {
+          ...inv,
+          irn: res.irn,
+          ack_no: res.ack_no,
+          ack_date: res.ack_date,
+          signed_qr_code: res.signed_qr_code,
+          einvoice_status: "generated"
+        };
+        setSelectedInvoice(updated);
+        setCloudInvoices((prev) => prev.map((item) => (item.id === inv.id ? updated : item)));
+        if (res.signed_qr_code) {
+          const qrUrl = await generateQrDataUrl(res.signed_qr_code);
+          setIrnQrDataUrl(qrUrl);
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to generate e-Invoice IRN");
+    } finally {
+      setIsGeneratingIrn(false);
+    }
+  };
+
+  const handleOpenEwayModal = (inv: Invoice) => {
+    setEwayModalInvoice(inv);
+    setEwayDistance(100);
+    setEwayVehicleNo("WB-19-AB-4521");
+    setEwayTransportMode("road");
+    setEwayTransporter("V-Trans Logistics");
+    setShowEwayModal(true);
+  };
+
+  const handleGenerateEWayBill = async () => {
+    if (!ewayModalInvoice) return;
+    setIsGeneratingEway(true);
+    try {
+      const res = await api.generateEWayBill({
+        invoice_id: ewayModalInvoice.id,
+        distance_km: Number(ewayDistance) || 50,
+        vehicle_number: ewayVehicleNo,
+        transport_mode: ewayTransportMode,
+        transporter_name: ewayTransporter
+      });
+      if (res && res.eway_bill_number) {
+        alert(`E-Way Bill ${res.eway_bill_number} generated successfully!\nValid Until: ${res.valid_until}`);
+        setShowEwayModal(false);
+        if (activeBusinessId) {
+          const ewayList = await api.fetchEWayBills(activeBusinessId);
+          if (ewayList && ewayList.data) setCloudEWayBills(ewayList.data);
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to generate E-Way Bill");
+    } finally {
+      setIsGeneratingEway(false);
+    }
+  };
+
+  const handleReconcileGstr2b = async (fileOrSample?: any) => {
+    if (!activeBusinessId) {
+      alert("No active company found.");
+      return;
+    }
+    setIsReconcilingGstr2b(true);
+    try {
+      const sampleGstr2b = fileOrSample || {
+        gstin: primaryGstin,
+        fp: "102026",
+        b2b: [
+          {
+            ctin: "19AAACS8812F1Z8",
+            cname: "Supreme Paper & Packaging",
+            inv: [
+              {
+                inum: "EXP/SUP/4521",
+                dt: "26-10-2026",
+                val: 28910.00,
+                pos: "19",
+                itcavl: "Y",
+                itc: { txval: 24500.00, cgst: 2205.00, sgst: 2205.00, igst: 0.00 }
+              }
+            ]
+          },
+          {
+            ctin: "27AABCD4411Q1ZN",
+            cname: "Delta Electronics Hardware",
+            inv: [
+              {
+                inum: "INV-9921",
+                dt: "28-10-2026",
+                val: 76700.00,
+                pos: "27",
+                itcavl: "Y",
+                itc: { txval: 65000.00, cgst: 0.00, sgst: 0.00, igst: 11700.00 }
+              }
+            ]
+          }
+        ]
+      };
+
+      const res = await api.reconcileGstr2b(activeBusinessId, "102026", sampleGstr2b);
+      setGstr2bReconcileResult(res);
+      alert(`GSTR-2B Reconciliation Complete!\nMatched Invoices: ${res.matched_invoices?.length || 0}\nMissing in Books: ${res.missing_in_books?.length || 0}`);
+    } catch (err: any) {
+      alert(err.message || "Reconciliation failed.");
+    } finally {
+      setIsReconcilingGstr2b(false);
+    }
+  };
+
   // Initial Sync from Cloud API
   const refreshCloudData = async (overrideBizId?: string) => {
     setIsSyncing(true);
@@ -1244,6 +1381,26 @@ export function App() {
             const gstrRes = await api.fetchGstr1Summary(currentBizId);
             if (gstrRes) {
               setGstr1Data(gstrRes);
+            }
+          } catch {
+            // Keep existing
+          }
+
+          // Fetch real E-Way Bills from Cloud
+          try {
+            const ewbRes = await api.fetchEWayBills(currentBizId);
+            if (ewbRes && ewbRes.data) {
+              setCloudEWayBills(ewbRes.data);
+            }
+          } catch {
+            // Keep existing
+          }
+
+          // Fetch real Inward Purchases from Cloud
+          try {
+            const purRes = await api.fetchPurchases(currentBizId);
+            if (purRes && purRes.data) {
+              setCloudPurchases(purRes.data);
             }
           } catch {
             // Keep existing
@@ -2345,13 +2502,55 @@ export function App() {
 
   // 3. INVOICE PREVIEW (PDF VIEW)
   else if (page === "InvoicePreview") {
+    const activeInv = selectedInvoice || (cloudInvoices.length > 0 ? cloudInvoices[0] : null);
+    const invNumberDisplay = activeInv ? activeInv.invoice_number : (invNum || "INV-2026-0042");
+    const invDateDisplay = activeInv ? activeInv.invoice_date : (invDate || "2026-11-08");
+    const invPartyName = activeInv?.customer ? (activeInv.customer.company_name || activeInv.customer.name) : (custName || "Apex Commercial Logistics");
+    const invPartyGstin = activeInv?.customer?.gstin || custGstin || "27AAACA1234F1Z5";
+    const invPartyPos = activeInv?.place_of_supply_state_code || posState || "27";
+    const invTaxable = activeInv ? Number(activeInv.total_taxable_value) : subtotal;
+    const invCgst = activeInv ? Number(activeInv.total_cgst) : cgst;
+    const invSgst = activeInv ? Number(activeInv.total_sgst) : sgst;
+    const invIgst = activeInv ? Number(activeInv.total_igst) : igst;
+    const invTotal = activeInv ? Number(activeInv.grand_total) : totalAmount;
+    const invIsInter = activeInv ? activeInv.is_interstate : isInter;
+    const invRows = activeInv && activeInv.items && activeInv.items.length > 0
+      ? activeInv.items.map((it: any, idx: number) => [
+          String(idx + 1),
+          it.item_name || it.name,
+          it.hsn_sac || it.hsn || "9983",
+          String(it.quantity || it.qty || 1),
+          Number(it.unit_price || it.rate || 0).toLocaleString("en-IN"),
+          `${Number(it.cgst_rate || 0) + Number(it.sgst_rate || 0) + Number(it.igst_rate || 0)}%`,
+          Number(it.total_amount || (it.quantity * it.unit_price) || 0).toLocaleString("en-IN")
+        ])
+      : items.map((it, idx) => [
+          String(idx + 1),
+          it.name,
+          it.hsn,
+          String(it.qty),
+          it.rate.toLocaleString("en-IN"),
+          `${it.gst}%`,
+          (it.qty * it.rate).toLocaleString("en-IN")
+        ]);
+
     screen = (
       <>
         <Heading
           title="Tax Invoice"
           sub="Preview and print official GST invoice"
           action={
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {activeInv && !activeInv.irn && (
+                <Btn secondary onClick={() => handleGenerateIrn(activeInv)} disabled={isGeneratingIrn}>
+                  <Sparkles size={14} style={{ marginRight: "4px" }} /> {isGeneratingIrn ? "Registering..." : "Generate IRN (e-Invoice)"}
+                </Btn>
+              )}
+              {activeInv && (
+                <Btn secondary onClick={() => handleOpenEwayModal(activeInv)}>
+                  <Truck size={14} style={{ marginRight: "4px" }} /> Generate E-Way Bill
+                </Btn>
+              )}
               <Btn secondary onClick={() => window.print()}>
                 <Download size={14} /> Download PDF
               </Btn>
@@ -2365,6 +2564,28 @@ export function App() {
           }
         />
         <div className="invoice-pdf-view">
+          {activeInv?.irn && (
+            <div style={{ background: "#ecfdf5", border: "1px solid #10b981", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#065f46", fontWeight: "bold", fontSize: "12px" }}>
+                  <CheckCircle2 size={16} color="#059669" /> Statutory e-Invoice IRN Registered
+                </div>
+                <div style={{ fontSize: "10px", color: "#047857", marginTop: "4px", fontFamily: "monospace", wordBreak: "break-all" }}>
+                  <strong>IRN:</strong> {activeInv.irn}
+                </div>
+                <div style={{ fontSize: "10px", color: "#047857", marginTop: "2px" }}>
+                  <strong>Ack No:</strong> {activeInv.ack_no} &nbsp;|&nbsp; <strong>Ack Date:</strong> {activeInv.ack_date}
+                </div>
+              </div>
+              {irnQrDataUrl && (
+                <div style={{ textAlign: "center" }}>
+                  <img src={irnQrDataUrl} alt="e-Invoice QR" style={{ width: "70px", height: "70px", borderRadius: "4px", border: "1px solid #a7f3d0" }} />
+                  <div style={{ fontSize: "8px", color: "#065f46", marginTop: "2px" }}>NIC Verified</div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid #2878e5", paddingBottom: "16px", marginBottom: "20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <div style={{ width: "48px", height: "48px", background: "#123b73", borderRadius: "10px", display: "grid", placeItems: "center", color: "white" }}>
@@ -2373,8 +2594,8 @@ export function App() {
               <div>
                 <h2 style={{ margin: 0, fontSize: "18px", color: "#123b73" }}>{legalName}</h2>
                 <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#718096" }}>
-                  {addressLine}, {city} – {pincode}<br />
-                  GSTIN: {primaryGstin}
+                  {addressLine || "Corporate Commercial Hub"}, {city || "Mumbai"} – {pincode || "400001"}<br />
+                  GSTIN: {primaryGstin || "27AAACK5555F1Z1"}
                 </p>
               </div>
             </div>
@@ -2384,50 +2605,42 @@ export function App() {
                 <span className="good">PAID</span>
               </div>
               <div style={{ fontSize: "11px", color: "#718096", marginTop: "8px", lineHeight: "1.6" }}>
-                Invoice No: <b>{invNum}</b><br />
-                Invoice Date: <b>{invDate}</b><br />
-                Due Date: <b>15/05/2026</b>
+                Invoice No: <b>{invNumberDisplay}</b><br />
+                Invoice Date: <b>{invDateDisplay}</b><br />
+                Place of Supply: <b>State {invPartyPos}</b>
               </div>
             </div>
           </div>
 
           <div style={{ background: "#f8fafd", padding: "14px", borderRadius: "8px", border: "1px solid #e8edf4", marginBottom: "20px", fontSize: "11px", lineHeight: "1.6" }}>
             <span style={{ fontSize: "10px", fontWeight: "bold", color: "#718096", textTransform: "uppercase" }}>Bill To:</span><br />
-            <strong style={{ fontSize: "13px", color: "#172033" }}>{custName}</strong><br />
-            456 Industrial Area, Pune – 411001<br />
-            GSTIN: <b>{custGstin}</b> | Place of Supply: <b>{posState}</b>
+            <strong style={{ fontSize: "13px", color: "#172033" }}>{invPartyName}</strong><br />
+            GSTIN: <b>{invPartyGstin}</b> | Place of Supply: <b>{invPartyPos}</b>
           </div>
 
           <Table
             headers={["#", "Description", "HSN/SAC", "Qty", "Rate (₹)", "GST %", "Amount (₹)"]}
-            rows={items.map((it, idx) => [
-              String(idx + 1),
-              it.name,
-              it.hsn,
-              String(it.qty),
-              it.rate.toLocaleString("en-IN"),
-              `${it.gst}%`,
-              (it.qty * it.rate).toLocaleString("en-IN")
-            ])}
+            rows={invRows}
           />
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px" }}>
             <div style={{ fontSize: "11px", color: "#718096", maxWidth: "450px" }}>
-              <strong>Amount in Words:</strong><br />
-              One Lakh Thirteen Thousand Two Hundred Eighty Rupees Only
+              <strong>Statutory Compliance & Bank Details:</strong><br />
+              Bank: <b>{bankName}</b> | A/C: <b>{accountNumber}</b> | IFSC: <b>{ifscCode}</b><br />
+              Subject to state jurisdiction. Computer generated invoice.
             </div>
             <div style={{ width: "260px", fontSize: "11px", lineHeight: "2" }}>
-              Subtotal <b style={{ float: "right" }}>₹ {subtotal.toLocaleString("en-IN")}</b><br />
-              {isInter ? (
-                <>IGST (18%) <b style={{ float: "right" }}>₹ {igst.toLocaleString("en-IN")}</b><br /></>
+              Subtotal <b style={{ float: "right" }}>₹ {invTaxable.toLocaleString("en-IN")}</b><br />
+              {invIsInter ? (
+                <>IGST <b style={{ float: "right" }}>₹ {invIgst.toLocaleString("en-IN")}</b><br /></>
               ) : (
                 <>
-                  CGST (9%) <b style={{ float: "right" }}>₹ {cgst.toLocaleString("en-IN")}</b><br />
-                  SGST (9%) <b style={{ float: "right" }}>₹ {sgst.toLocaleString("en-IN")}</b><br />
+                  CGST <b style={{ float: "right" }}>₹ {invCgst.toLocaleString("en-IN")}</b><br />
+                  SGST <b style={{ float: "right" }}>₹ {invSgst.toLocaleString("en-IN")}</b><br />
                 </>
               )}
               <div style={{ borderTop: "2px solid #172033", marginTop: "8px", paddingTop: "8px", fontSize: "14px" }}>
-                <strong>Total Amount</strong> <strong style={{ float: "right", color: "#123b73" }}>₹ {totalAmount.toLocaleString("en-IN")}</strong>
+                <strong>Total Amount</strong> <strong style={{ float: "right", color: "#123b73" }}>₹ {invTotal.toLocaleString("en-IN")}</strong>
               </div>
             </div>
           </div>
@@ -2521,21 +2734,54 @@ export function App() {
         </div>
 
         {salesSubmenu === "invoices" && (
-          <Panel title="Tax Invoices Register" sub="Complete outward supplies audit trail with GSTIN place of supply">
+          <Panel
+            title="Tax Invoices Register"
+            sub="Complete outward supplies audit trail with GSTIN place of supply"
+            action={
+              <div style={{ display: "flex", gap: "8px" }}>
+                {activeBusinessId && (
+                  <a
+                    href={api.getTallyXmlExportUrl(activeBusinessId, "all")}
+                    download={`quantum_gst_tally_${activeBusinessId}.xml`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", border: "1px solid #cbd5e1", background: "white", color: "#334155", fontWeight: 500 }}
+                  >
+                    <Download size={13} /> Export to Tally XML
+                  </a>
+                )}
+                <Btn onClick={() => setPage("Billing")}>
+                  <Plus size={14} style={{ marginRight: "4px" }} /> Create Invoice
+                </Btn>
+              </div>
+            }
+          >
             {cloudInvoices.length > 0 ? (
               <Table
-                headers={["Invoice #", "Date", "Customer", "Place of Supply", "Taxable (₹)", "GST (₹)", "Total (₹)", "Action"]}
+                headers={["Invoice #", "Date", "Customer", "IRN Status", "Place of Supply", "Taxable (₹)", "GST (₹)", "Total (₹)", "Action"]}
                 rows={cloudInvoices.map((inv) => [
                   inv.invoice_number,
                   inv.invoice_date,
-                  inv.customer ? inv.customer.name : "Cash Customer",
+                  inv.customer ? (inv.customer.company_name || inv.customer.name) : "Cash Customer",
+                  inv.irn ? "Generated" : "Pending",
                   inv.place_of_supply_state_code,
                   Number(inv.total_taxable_value).toLocaleString("en-IN"),
                   Number(inv.total_tax_amount).toLocaleString("en-IN"),
                   `₹ ${Number(inv.grand_total).toLocaleString("en-IN")}`,
                   "View"
                 ])}
-                onAction={() => setPage("InvoicePreview")}
+                onAction={(_act, _row, index) => {
+                  const inv = cloudInvoices[index];
+                  if (inv) {
+                    setSelectedInvoice(inv);
+                    if (inv.signed_qr_code) {
+                      generateQrDataUrl(inv.signed_qr_code).then(setIrnQrDataUrl);
+                    } else {
+                      setIrnQrDataUrl("");
+                    }
+                  }
+                  setPage("InvoicePreview");
+                }}
               />
             ) : (
               <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748b" }}>
@@ -2755,14 +3001,30 @@ export function App() {
             title="Purchase Bills Register"
             sub="Inward supplier tax invoices with ITC eligibility & reverse charge tracking"
             action={
-              <Btn secondary onClick={() => setPage("Reconciliation")}>
-                <RefreshCw size={13} style={{ marginRight: "4px" }} /> Match with GSTR-2B
-              </Btn>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Btn secondary onClick={() => navigateToGstSubmenu("gstr-2b")}>
+                  <RefreshCw size={13} style={{ marginRight: "4px" }} /> Match with GSTR-2B
+                </Btn>
+                <Btn onClick={() => setPage("Billing")}>
+                  <Plus size={14} style={{ marginRight: "4px" }} /> New Purchase Bill
+                </Btn>
+              </div>
             }
           >
             <Table
               headers={["Bill #", "Supplier Inv #", "Date", "Supplier Name", "Supplier GSTIN", "Taxable (₹)", "GST (₹)", "Total (₹)", "ITC Status", "Payment"]}
-              rows={purchaseBills.map((b) => [
+              rows={cloudPurchases.length > 0 ? cloudPurchases.map((b) => [
+                b.id.substring(0, 8),
+                b.bill_number,
+                b.bill_date,
+                b.supplier ? (b.supplier.company_name || b.supplier.name) : "Vendor",
+                b.supplier?.gstin || "URP",
+                `₹ ${Number(b.total_taxable_value).toLocaleString("en-IN")}`,
+                `₹ ${Number(b.total_tax_amount).toLocaleString("en-IN")}`,
+                `₹ ${Number(b.grand_total).toLocaleString("en-IN")}`,
+                b.itc_eligibility === "ineligible" ? "Ineligible" : "Eligible ITC",
+                b.status === "received" ? "Paid" : b.status
+              ]) : purchaseBills.map((b) => [
                 b.id,
                 b.billNo,
                 b.date,
@@ -3288,14 +3550,41 @@ export function App() {
             title="GSTR-2B Input Tax Credit Matching"
             sub="Reconcile auto-drafted portal statements against inward purchase register"
             action={
-              <Btn secondary onClick={() => alert("GSTR-2B data synced with GSTN Portal.")}>
-                <RefreshCw size={13} style={{ marginRight: "4px" }} /> Refresh from Portal
-              </Btn>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Btn secondary onClick={() => handleReconcileGstr2b()} disabled={isReconcilingGstr2b}>
+                  <RefreshCw size={13} style={{ marginRight: "4px" }} /> {isReconcilingGstr2b ? "Reconciling..." : "Run Statutory Reconciliation"}
+                </Btn>
+              </div>
             }
           >
+            {gstr2bReconcileResult && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+                <div style={{ background: "#ecfdf5", border: "1px solid #10b981", padding: "12px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "#047857" }}>Eligible Matched ITC</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#065f46" }}>₹ {Number(gstr2bReconcileResult.summary?.total_eligible_itc || 0).toLocaleString("en-IN")}</div>
+                </div>
+                <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", padding: "12px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "#475569" }}>Matched Invoices</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1e293b" }}>{gstr2bReconcileResult.summary?.matched_count || 0}</div>
+                </div>
+                <div style={{ background: "#fffbeb", border: "1px solid #f59e0b", padding: "12px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "#b45309" }}>Missing in Books (Action Required)</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#92400e" }}>{gstr2bReconcileResult.summary?.missing_books_count || 0}</div>
+                </div>
+              </div>
+            )}
             <Table
               headers={["Supplier GSTIN", "Trade Name", "Invoice No", "Invoice Date", "Taxable (₹)", "Eligible ITC (₹)", "Match Status", "Action"]}
-              rows={[
+              rows={gstr2bReconcileResult?.matched_invoices?.length ? gstr2bReconcileResult.matched_invoices.map((m: any) => [
+                m.ctin,
+                m.cname || "Supplier",
+                m.inum,
+                m.dt,
+                Number(m.txval || 0).toLocaleString("en-IN"),
+                Number(m.itc_amount || 0).toLocaleString("en-IN"),
+                "Matched",
+                "ITC Claimed"
+              ]) : [
                 ["19AAACS8812F1Z8", "Supreme Paper & Packaging", "EXP/SUP/4521", "2026-10-26", "24,500", "4,410", "Matched", "ITC Accepted"],
                 ["27AABCD4411Q1ZN", "Delta Electronics Hardware", "INV-9921", "2026-10-28", "65,000", "11,700", "Matched", "ITC Accepted"]
               ]}
@@ -3329,16 +3618,33 @@ export function App() {
             title="E-Way Bill & E-Invoice Management"
             sub="Generate electronic consignment bills and Invoice Reference Numbers (IRN)"
             action={
-              <Btn onClick={() => alert("E-Way bill request dispatched to NIC Portal.")}>
-                <Plus size={14} style={{ marginRight: "4px" }} /> Generate E-Way Bill
-              </Btn>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Btn onClick={() => {
+                  if (cloudInvoices.length > 0) {
+                    handleOpenEwayModal(cloudInvoices[0]);
+                  } else {
+                    alert("Please generate a tax invoice before creating an E-Way Bill.");
+                  }
+                }}>
+                  <Plus size={14} style={{ marginRight: "4px" }} /> Generate E-Way Bill
+                </Btn>
+              </div>
             }
           >
             <Table
-              headers={["E-Way Bill #", "Invoice #", "Customer / Consignee", "Valid From", "Valid Until", "Vehicle #", "Transporter", "Status"]}
-              rows={[
-                ["191029384756", "INV/26-27/0001", "Kolkata Retail Solutions", "2026-10-29", "2026-10-31", "WB-19-AB-4521", "V-Trans Logistics", "Active / In-Transit"],
-                ["191022394851", "INV/26-27/0002", "TechCorp Logistics Pvt Ltd", "2026-10-22", "2026-10-24", "WB-24-DE-9912", "Safexpress India", "Closed / Delivered"]
+              headers={["E-Way Bill #", "Invoice #", "Valid From", "Valid Until", "Vehicle #", "Distance (KM)", "Status", "Action"]}
+              rows={cloudEWayBills.length > 0 ? cloudEWayBills.map((ewb) => [
+                ewb.eway_bill_number,
+                ewb.doc_number || "—",
+                ewb.eway_bill_date ? ewb.eway_bill_date.split("T")[0] : "—",
+                ewb.valid_until ? ewb.valid_until.split("T")[0] : "—",
+                ewb.vehicle_number || "—",
+                `${ewb.distance_km} KM`,
+                ewb.status === "active" ? "Active" : ewb.status,
+                "View"
+              ]) : [
+                ["191029384756", "INV/26-27/0001", "2026-10-29", "2026-10-31", "WB-19-AB-4521", "120 KM", "Active", "View"],
+                ["191022394851", "INV/26-27/0002", "2026-10-22", "2026-10-24", "WB-24-DE-9912", "85 KM", "Closed", "View"]
               ]}
             />
           </Panel>
@@ -5612,6 +5918,40 @@ export function App() {
               setPurchaseBills([newBill, ...purchaseBills]);
               setShowRecordPurchaseModal(false);
               showSaveSuccess(`Purchase Bill ${newBill.id} recorded successfully!`);
+
+              if (activeBusinessId && activeGstinId) {
+                api.createCustomer({
+                  business_id: activeBusinessId,
+                  customer_type: "supplier",
+                  name: pbSupplier,
+                  company_name: pbSupplier,
+                  gstin: pbGstin ? pbGstin.toUpperCase() : undefined,
+                  state_code: stateCode || "27",
+                  state_name: stateName || "Maharashtra",
+                }).then((c) => {
+                  if (c && c.id) {
+                    api.createPurchase({
+                      business_id: activeBusinessId,
+                      business_gstin_id: activeGstinId,
+                      supplier_id: c.id,
+                      bill_number: pbBillNo || `PB-${Date.now()}`,
+                      bill_date: pbDate,
+                      place_of_supply_state_code: stateCode || "27",
+                      itc_eligibility: pbItcEligible ? "inputs" : "ineligible",
+                      items: [{
+                        item_name: "Inward Goods / Materials",
+                        hsn_sac: "9983",
+                        quantity: 1,
+                        unit: "NOS",
+                        unit_price: Number(pbTaxable),
+                        discount_amount: 0,
+                        gst_rate: Number(pbGstRate),
+                      }]
+                    }).then(() => refreshCloudData()).catch(() => {});
+                  }
+                }).catch(() => {});
+              }
+
               setPbSupplier("");
               setPbGstin("");
               setPbTaxable(0);
@@ -5908,6 +6248,74 @@ export function App() {
                 <Btn>Generate Token</Btn>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ================= GENERATE E-WAY BILL MODAL ================= */}
+      {showEwayModal && (
+        <div className="modal-backdrop" onClick={() => setShowEwayModal(false)}>
+          <div className="modal-box" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Truck size={18} style={{ color: "#2563eb" }} />
+                <h3>Generate Statutory E-Way Bill (NIC Portal)</h3>
+              </div>
+              <button onClick={() => setShowEwayModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "grid", gap: "14px" }}>
+              <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px", color: "#334155" }}>
+                <div><strong>Invoice Number:</strong> {ewayModalInvoice?.invoice_number || "INV-001"}</div>
+                <div><strong>Consignee:</strong> {ewayModalInvoice?.customer ? (ewayModalInvoice.customer.company_name || ewayModalInvoice.customer.name) : "Cash Customer"}</div>
+                <div><strong>Total Value:</strong> ₹ {Number(ewayModalInvoice?.grand_total || 0).toLocaleString("en-IN")}</div>
+              </div>
+
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <Field
+                  label="Approx. Distance (KM) *"
+                  type="number"
+                  value={String(ewayDistance)}
+                  onChange={(v) => setEwayDistance(Number(v) || 1)}
+                />
+                <Field
+                  label="Vehicle Number *"
+                  value={ewayVehicleNo}
+                  onChange={setEwayVehicleNo}
+                />
+              </div>
+
+              <div className="fields" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <Field
+                  label="Transporter Name / GSTIN"
+                  value={ewayTransporter}
+                  onChange={setEwayTransporter}
+                />
+                <div className="field">
+                  <label>Mode of Transport</label>
+                  <select
+                    value={ewayTransportMode}
+                    onChange={(e) => setEwayTransportMode(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+                  >
+                    <option value="road">1 - Road</option>
+                    <option value="rail">2 - Rail</option>
+                    <option value="air">3 - Air</option>
+                    <option value="ship">4 - Ship</option>
+                  </select>
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>
+                * Distance calculation follows GST Rule 138 (1 day validity for every 200 KM or part thereof).
+              </p>
+            </div>
+            <div className="modal-footer">
+              <Btn secondary onClick={() => setShowEwayModal(false)}>Cancel</Btn>
+              <Btn onClick={handleGenerateEWayBill} disabled={isGeneratingEway}>
+                {isGeneratingEway ? "Dispatching to NIC..." : "Generate E-Way Bill"}
+              </Btn>
+            </div>
           </div>
         </div>
       )}

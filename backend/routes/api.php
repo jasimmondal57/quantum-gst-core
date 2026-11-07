@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CreditDebitNoteController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\EInvoiceController;
 use App\Http\Controllers\Api\EWayBillController;
@@ -82,6 +83,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/reports/gstr3b', [GstReportController::class, 'gstr3b']);
         Route::post('/reports/gstr2b-reconcile', [GstReportController::class, 'gstr2bReconcile']);
         Route::get('/reports/gstr9', [GstReportController::class, 'gstr9']);
+
+        // Tally ERP 9 / Tally Prime Statutory XML Export
+        Route::get('/export/tally-xml', [ExportController::class, 'tallyXml']);
 
         // Double-Entry Accounting & Financial Statements
         Route::prefix('accounting')->group(function () {
