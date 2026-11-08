@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend-tests:
-    name: Backend Test Suite (PHP 8.3 + PostgreSQL 16)
+    name: Backend Test Suite (PHP 8.4 + PostgreSQL 16)
     runs-on: ubuntu-latest
 
     services:
@@ -40,10 +40,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up PHP 8.3
+      - name: Set up PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, pgsql, bcmath, redis, zip
           coverage: none
 
