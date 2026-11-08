@@ -100,9 +100,20 @@ class PurchaseController extends Controller
 
         $this->authorizeBusiness($request, $validated['business_id']);
 
-        $supplierGstin = BusinessGstin::findOrFail($validated['business_gstin_id']);
+        // Multi-Tenant Isolation: Ensure all foreign-key entities strictly belong to this business
+        $businessGstin = BusinessGstin::where('business_id', $validated['business_id'])
+            ->findOrFail($validated['business_gstin_id']);
+
+        \App\Models\Customer::where('business_id', $validated['business_id'])
+            ->findOrFail($validated['supplier_id']);
+
+        if (!empty($validated['godown_id'])) {
+            \App\Models\Godown::where('business_id', $validated['business_id'])
+                ->findOrFail($validated['godown_id']);
+        }
+
         $isInterstate = $this->gstEngine->isInterstate(
-            $supplierGstin->state_code,
+            $businessGstin->state_code,
             $validated['place_of_supply_state_code']
         );
 
@@ -205,3 +216,4 @@ class PurchaseController extends Controller
         return response()->json($bill);
     }
 }
+

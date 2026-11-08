@@ -303,6 +303,115 @@ class AccountingEngineService
     }
 
     /**
+     * Automatically post double-entry reversal for a Cancelled Invoice.
+     */
+    public function reverseInvoice(Invoice $invoice, string $reason = 'Cancelled by user'): JournalEntry
+    {
+        $bizId = $invoice->business_id;
+        $this->ensureStandardChartOfAccounts($bizId);
+
+        $arAccount = $this->getAccount($bizId, '1030'); // Sundry Debtors
+        $salesAccount = $this->getAccount($bizId, '4010'); // Sales Revenue
+        $cgstAccount = $this->getAccount($bizId, '2020'); // Output CGST
+        $sgstAccount = $this->getAccount($bizId, '2021'); // Output SGST
+        $igstAccount = $this->getAccount($bizId, '2022'); // Output IGST
+        $cessAccount = $this->getAccount($bizId, '2023'); // Output Cess
+        $roundOffAccount = $this->getAccount($bizId, '5090');
+
+        $lines = [];
+
+        // 1. Credit Sundry Debtors (Reversing customer receivable)
+        $lines[] = [
+            'account_id' => $arAccount->id,
+            'party_type' => 'customer',
+            'party_id' => $invoice->customer_id,
+            'debit' => '0.00',
+            'credit' => (string) $invoice->grand_total,
+            'description' => "Invoice #{$invoice->invoice_number} cancellation receivable reversal",
+        ];
+
+        // 2. Debit Sales Revenue (Reversing outward revenue)
+        $lines[] = [
+            'account_id' => $salesAccount->id,
+            'debit' => (string) $invoice->total_taxable_value,
+            'credit' => '0.00',
+            'description' => "Sales revenue cancellation for Invoice #{$invoice->invoice_number}",
+        ];
+
+        // 3. Debit Output Taxes (Reversing tax liabilities)
+        if (bccomp((string) $invoice->total_cgst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $cgstAccount->id,
+                'debit' => (string) $invoice->total_cgst,
+                'credit' => '0.00',
+                'description' => 'Output CGST tax cancellation reversal',
+            ];
+        }
+
+        if (bccomp((string) $invoice->total_sgst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $sgstAccount->id,
+                'debit' => (string) $invoice->total_sgst,
+                'credit' => '0.00',
+                'description' => 'Output SGST/UTGST tax cancellation reversal',
+            ];
+        }
+
+        if (bccomp((string) $invoice->total_igst, '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $igstAccount->id,
+                'debit' => (string) $invoice->total_igst,
+                'credit' => '0.00',
+                'description' => 'Output IGST tax cancellation reversal',
+            ];
+        }
+
+        if (bccomp((string) ($invoice->total_cess ?? '0.00'), '0.00', 2) > 0) {
+            $lines[] = [
+                'account_id' => $cessAccount->id,
+                'debit' => (string) $invoice->total_cess,
+                'credit' => '0.00',
+                'description' => 'Output GST Cess tax cancellation reversal',
+            ];
+        }
+
+        // 4. Exact Double-Entry Balance Calculation for Rounding Off Reversal
+        $currentCredits = (string) $invoice->grand_total;
+        $currentDebits = '0.00';
+        foreach ($lines as $l) {
+            $currentDebits = bcadd($currentDebits, (string) $l['debit'], 2);
+        }
+
+        $diff = bcsub($currentCredits, $currentDebits, 2);
+        if (bccomp($diff, '0.00', 2) > 0) {
+            // Need more debit
+            $lines[] = [
+                'account_id' => $roundOffAccount->id,
+                'debit' => $diff,
+                'credit' => '0.00',
+                'description' => 'Invoice rounding off reversal adjustment',
+            ];
+        } elseif (bccomp($diff, '0.00', 2) < 0) {
+            // Need more credit
+            $lines[] = [
+                'account_id' => $roundOffAccount->id,
+                'debit' => '0.00',
+                'credit' => bcsub('0.00', $diff, 2),
+                'description' => 'Invoice rounding off reversal adjustment',
+            ];
+        }
+
+        return $this->postJournalEntry(
+            businessId: $bizId,
+            entryDate: now()->format('Y-m-d'),
+            narration: "Statutory cancellation reversal for Tax Invoice #{$invoice->invoice_number}. Reason: {$reason}",
+            lines: $lines,
+            refType: 'invoice_cancellation',
+            refId: $invoice->id
+        );
+    }
+
+    /**
      * Automatically post double-entry records for an Inward Purchase Bill.
      */
     public function postPurchaseBill(PurchaseBill $bill): JournalEntry

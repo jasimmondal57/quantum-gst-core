@@ -49,12 +49,9 @@ class OnboardingController extends Controller
      */
     public function completeSetup(Request $request)
     {
-        $validated = $request->validate([
-            // Admin User (if not logged in)
-            'admin_name' => 'nullable|string|max:255',
-            'admin_email' => 'nullable|email',
-            'admin_password' => 'nullable|string|min:8',
+        $authUser = $request->user('sanctum') ?? $request->user();
 
+        $rules = [
             // Company Profile
             'legal_name' => 'required|string|max:255',
             'trade_name' => 'nullable|string|max:255',
@@ -78,16 +75,24 @@ class OnboardingController extends Controller
 
             // Selected Sales Channels
             'enabled_channels' => 'nullable|array',
-        ]);
+        ];
 
-        return DB::transaction(function () use ($validated, $request) {
-            $user = $request->user();
+        if (! $authUser) {
+            $rules['admin_name'] = 'nullable|string|max:255';
+            $rules['admin_email'] = 'nullable|email|unique:users,email';
+            $rules['admin_password'] = 'required|string|min:8';
+        }
+
+        $validated = $request->validate($rules);
+
+        return DB::transaction(function () use ($validated, $authUser) {
+            $user = $authUser;
 
             if (! $user) {
                 $user = User::create([
                     'name' => $validated['admin_name'] ?? 'Admin',
                     'email' => $validated['admin_email'] ?? $validated['email'],
-                    'password' => Hash::make($validated['admin_password'] ?? 'Quantum@2026!'),
+                    'password' => Hash::make($validated['admin_password']),
                 ]);
             }
 

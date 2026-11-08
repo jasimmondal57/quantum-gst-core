@@ -78,3 +78,4 @@ class PurchaseBill extends Model
         return $this->hasMany(PurchaseBillItem::class);
     }
 }
+

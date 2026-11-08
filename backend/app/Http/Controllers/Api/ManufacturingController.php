@@ -158,6 +158,12 @@ class ManufacturingController extends Controller
 
         $this->authorizeBusiness($request, $validated['business_id']);
 
+        // Tenant Isolation: Ensure finished good and raw materials belong to this business
+        \App\Models\Product::where('business_id', $validated['business_id'])->findOrFail($validated['finished_good_id']);
+        foreach ($validated['items'] as $item) {
+            \App\Models\Product::where('business_id', $validated['business_id'])->findOrFail($item['raw_material_id']);
+        }
+
         $bom = $this->mfgService->createBOM(
             businessId: $validated['business_id'],
             finishedGoodId: $validated['finished_good_id'],
@@ -226,6 +232,11 @@ class ManufacturingController extends Controller
         ]);
 
         $this->authorizeBusiness($request, $validated['business_id']);
+
+        // Tenant Isolation: Ensure BOM and Godowns belong to this business
+        BillOfMaterial::where('business_id', $validated['business_id'])->findOrFail($validated['bom_id']);
+        Godown::where('business_id', $validated['business_id'])->findOrFail($validated['source_godown_id']);
+        Godown::where('business_id', $validated['business_id'])->findOrFail($validated['target_godown_id']);
 
         $order = $this->mfgService->createProductionOrder(
             businessId: $validated['business_id'],
@@ -319,6 +330,14 @@ class ManufacturingController extends Controller
         ]);
 
         $this->authorizeBusiness($request, $validated['business_id']);
+
+        // Tenant Isolation: Ensure Godowns and transferred products belong to this business
+        Godown::where('business_id', $validated['business_id'])->findOrFail($validated['source_godown_id']);
+        Godown::where('business_id', $validated['business_id'])->findOrFail($validated['destination_godown_id']);
+
+        foreach ($validated['items'] as $item) {
+            \App\Models\Product::where('business_id', $validated['business_id'])->findOrFail($item['product_id']);
+        }
 
         $transfer = $this->mfgService->transferStock(
             businessId: $validated['business_id'],

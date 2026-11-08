@@ -25,6 +25,21 @@ class JournalEntryLine extends Model
         'credit' => 'decimal:2',
     ];
 
+    protected static function booted()
+    {
+        static::updating(function ($line) {
+            if ($line->journalEntry?->status === 'posted') {
+                throw new \RuntimeException('Lines of posted journal entries cannot be modified.');
+            }
+        });
+
+        static::deleting(function ($line) {
+            if ($line->journalEntry?->status === 'posted') {
+                throw new \RuntimeException('Lines of posted journal entries cannot be deleted.');
+            }
+        });
+    }
+
     public function journalEntry()
     {
         return $this->belongsTo(JournalEntry::class);

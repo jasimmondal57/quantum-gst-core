@@ -273,4 +273,44 @@ class InvoiceController extends Controller
         $cleanNumber = str_replace(['/', '\\'], '-', $invoice->invoice_number);
         return $pdf->download("Tax_Invoice_{$cleanNumber}.pdf");
     }
+
+    /**
+     * Cancel an issued invoice and post statutory double-entry reversal.
+     */
+    public function cancel(Request $request, string $id)
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        $query = Invoice::with(['items', 'customer', 'businessGstin']);
+
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $query->whereIn('organization_id', $userOrgIds);
+        }
+
+        $invoice = $query->findOrFail($id);
+
+        if ($invoice->status === 'cancelled') {
+            return response()->json(['message' => 'Invoice is already cancelled.'], 400);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:255',
+        ]);
+
+        return DB::transaction(function () use ($invoice, $validated) {
+            $invoice->status = 'cancelled';
+            $invoice->notes = ($invoice->notes ? $invoice->notes . "\n" : "") . "Cancelled on " . now()->toDateTimeString() . " - Reason: " . $validated['reason'];
+            $invoice->save();
+
+            // Post double-entry reversal
+            $reversalEntry = $this->accountingService->reverseInvoice($invoice, $validated['reason']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Invoice cancelled and general ledger reversal entry posted.',
+                'invoice' => $invoice,
+                'reversal_entry' => $reversalEntry,
+            ]);
+        });
+    }
 }

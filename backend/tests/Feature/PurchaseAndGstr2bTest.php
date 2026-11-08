@@ -268,3 +268,4 @@ class PurchaseAndGstr2bTest extends TestCase
         $this->assertEquals('4500.00', $gstr9['table_4_outward_taxable']['b2b']['samt']);
     }
 }
+

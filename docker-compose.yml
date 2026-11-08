@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_DATABASE:-quantumgst}
       POSTGRES_USER: ${DB_USERNAME:-quantumgst_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Production DB_PASSWORD must be configured in environment}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups/postgres:/backups
@@ -40,7 +40,7 @@ services:
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-quantumgst}
       DB_USERNAME: ${DB_USERNAME:-quantumgst_user}
-      DB_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      DB_PASSWORD: ${DB_PASSWORD:?Production DB_PASSWORD must be configured in environment}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       QUEUE_CONNECTION: redis
@@ -68,7 +68,7 @@ services:
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-quantumgst}
       DB_USERNAME: ${DB_USERNAME:-quantumgst_user}
-      DB_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      DB_PASSWORD: ${DB_PASSWORD:?Production DB_PASSWORD must be configured in environment}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       QUEUE_CONNECTION: redis
@@ -87,7 +87,6 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       - backend
     networks:

@@ -29,22 +29,35 @@ class ManufacturingService
         ?string $batchNumber = null
     ): StockBalance {
         return DB::transaction(function () use ($businessId, $godownId, $productId, $quantityDelta, $unitCost, $batchNumber) {
-            $balance = StockBalance::firstOrCreate(
-                [
+            $balance = StockBalance::where('business_id', $businessId)
+                ->where('godown_id', $godownId)
+                ->where('product_id', $productId)
+                ->where('batch_number', $batchNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$balance) {
+                if (bccomp($quantityDelta, '0.0000', 4) < 0) {
+                    throw new InvalidArgumentException("Insufficient stock in Godown. Available: 0.0000, Requested: " . ltrim($quantityDelta, '-'));
+                }
+                $balance = StockBalance::create([
                     'business_id' => $businessId,
                     'godown_id' => $godownId,
                     'product_id' => $productId,
                     'batch_number' => $batchNumber,
-                ],
-                [
                     'quantity' => '0.0000',
                     'unit_cost' => $unitCost,
                     'valuation_method' => 'weighted_average',
-                ]
-            );
+                ]);
+            }
 
             $currentQty = (string) $balance->quantity;
             $newQty = bcadd($currentQty, $quantityDelta, 4);
+
+            // Prevent negative stock
+            if (bccomp($newQty, '0.0000', 4) < 0) {
+                throw new InvalidArgumentException("Insufficient stock in Godown. Available: {$currentQty}, Requested: " . ltrim($quantityDelta, '-'));
+            }
 
             // Calculate weighted average unit cost if incoming stock
             if (bccomp($quantityDelta, '0.0000', 4) > 0 && bccomp($unitCost, '0.00', 2) > 0) {

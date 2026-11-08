@@ -61,6 +61,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/invoices', [InvoiceController::class, 'store']);
         Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
         Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf']);
+        Route::post('/invoices/{id}/cancel', [InvoiceController::class, 'cancel']);
 
         // Statutory Credit & Debit Notes
         Route::get('/credit-debit-notes', [CreditDebitNoteController::class, 'index']);

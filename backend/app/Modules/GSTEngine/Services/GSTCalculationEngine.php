@@ -218,9 +218,8 @@ class GSTCalculationEngine
         // Subtotal is strictly the sum of taxable base and taxes
         $subTotal = bcadd($totalTaxable, $totalTax, 2);
 
-        // Standard Indian statutory invoice rounding to nearest whole rupee
-        $wholeRupee = round((float) $subTotal);
-        $grandTotal = number_format($wholeRupee, 2, '.', '');
+        // Standard Indian statutory invoice rounding to nearest whole rupee using exact BCMath
+        $grandTotal = $this->bcroundRupee($subTotal);
         $roundOff = bcsub($grandTotal, $subTotal, 2);
 
         return [
@@ -234,5 +233,24 @@ class GSTCalculationEngine
             'round_off' => $roundOff,
             'grand_total' => $grandTotal,
         ];
+    }
+
+    /**
+     * Pure BCMath decimal-string rupee rounding (half-up) with zero floating-point arithmetic.
+     */
+    public function bcroundRupee(string $number): string
+    {
+        if (bccomp($number, '0.00', 4) === 0) {
+            return '0.00';
+        }
+
+        $isNegative = str_starts_with($number, '-');
+        $abs = $isNegative ? substr($number, 1) : $number;
+
+        // Add 0.50 for half-up rounding, then truncate decimals
+        $rounded = bcdiv(bcadd($abs, '0.50', 4), '1', 0);
+        $result = $rounded . '.00';
+
+        return $isNegative ? ('-' . $result) : $result;
     }
 }

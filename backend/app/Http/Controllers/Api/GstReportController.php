@@ -97,7 +97,7 @@ class GstReportController extends Controller
             $isB2b = !empty($inv->customer?->gstin);
             $isExport = $inv->invoice_type === 'export';
             $isInterstate = (bool) $inv->is_interstate;
-            $grandVal = (float) $grand;
+            $isLargeB2c = $isInterstate && (bccomp($grand, '250000.00', 2) > 0);
 
             $doc = [
                 'invoice_number' => $inv->invoice_number,
@@ -122,7 +122,7 @@ class GstReportController extends Controller
             } elseif ($isB2b) {
                 // Table 4: B2B Invoices to Registered Persons
                 $b2b[] = $doc;
-            } elseif ($isInterstate && $grandVal > 250000) {
+            } elseif ($isLargeB2c) {
                 // Table 5: B2CL Large Invoices (Inter-State > 2.5 Lakhs)
                 $b2cl[] = $doc;
             } elseif ($inv->invoice_type === 'bill_of_supply' || (bccomp($tax, '0.00', 2) === 0)) {

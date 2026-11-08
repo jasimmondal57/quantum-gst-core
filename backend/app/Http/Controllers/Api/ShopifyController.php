@@ -42,7 +42,11 @@ class ShopifyController extends Controller
         $secret = config('services.shopify.webhook_secret') ?? env('SHOPIFY_WEBHOOK_SECRET');
         $hmacHeader = $request->header('X-Shopify-Hmac-Sha256');
 
-        if (!empty($secret) && !empty($hmacHeader)) {
+        if (!empty($secret)) {
+            if (empty($hmacHeader)) {
+                return response()->json(['error' => 'Missing X-Shopify-Hmac-Sha256 webhook signature header.'], 401);
+            }
+
             $rawPayload = $request->getContent();
             $calculatedHmac = base64_encode(hash_hmac('sha256', $rawPayload, $secret, true));
 
@@ -86,6 +90,23 @@ class ShopifyController extends Controller
         }
 
         return DB::transaction(function () use ($business, $normalized) {
+            // Concurrency Lock: Re-verify under row lock to prevent race condition duplicates
+            $lockedExisting = Invoice::where('business_id', $business->id)
+                ->where('external_reference_id', (string) $normalized['shopify_order_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedExisting) {
+                return response()->json([
+                    'success' => true,
+                    'idempotent' => true,
+                    'message' => 'Shopify order already processed.',
+                    'invoice_id' => $lockedExisting->id,
+                    'invoice_number' => $lockedExisting->invoice_number,
+                    'grand_total' => $lockedExisting->grand_total,
+                    'pdf_url' => url("/api/v1/invoices/{$lockedExisting->id}/pdf"),
+                ], 200);
+            }
             $gstin = $business->gstins->firstWhere('is_primary', true) ?? $business->gstins->first();
             $posStateCode = $normalized['place_of_supply_state_code'];
             $isInterstate = $this->gstEngine->isInterstate($gstin->state_code, $posStateCode);

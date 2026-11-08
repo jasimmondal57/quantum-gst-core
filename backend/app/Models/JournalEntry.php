@@ -28,6 +28,23 @@ class JournalEntry extends Model
         'total_credit' => 'decimal:2',
     ];
 
+    protected static function booted()
+    {
+        static::updating(function ($entry) {
+            if ($entry->getOriginal('status') === 'posted') {
+                if ($entry->isDirty(['business_id', 'entry_number', 'total_debit', 'total_credit', 'entry_date'])) {
+                    throw new \RuntimeException('Posted journal entries are statutory records and cannot be altered. Post a reversal or adjusting entry instead.');
+                }
+            }
+        });
+
+        static::deleting(function ($entry) {
+            if ($entry->status === 'posted') {
+                throw new \RuntimeException('Posted journal entries cannot be deleted. Create a reversal entry instead.');
+            }
+        });
+    }
+
     public function business()
     {
         return $this->belongsTo(Business::class);
