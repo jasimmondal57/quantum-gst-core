@@ -2296,6 +2296,7 @@ export function CreateInvoiceScreen({
             placeItems: "center",
             padding: "20px"
           }}
+          onClick={() => setShowProductSearchModal(false)}
         >
           <div
             style={{
@@ -2306,6 +2307,7 @@ export function CreateInvoiceScreen({
               boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
               overflow: "hidden"
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -2418,6 +2420,7 @@ export function CreateInvoiceScreen({
             placeItems: "center",
             padding: "20px"
           }}
+          onClick={() => setShowQuickCustomerModal(false)}
         >
           <div
             style={{
@@ -2428,6 +2431,7 @@ export function CreateInvoiceScreen({
               boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
               overflow: "hidden"
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -2570,6 +2574,7 @@ export function CreateInvoiceScreen({
             placeItems: "center",
             padding: "20px"
           }}
+          onClick={() => setShowInstantPdfModal(false)}
         >
           <div
             style={{
@@ -2583,6 +2588,7 @@ export function CreateInvoiceScreen({
               display: "flex",
               flexDirection: "column"
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div

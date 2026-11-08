@@ -46,12 +46,13 @@ export const Modal: React.FC<ModalProps> = ({
       <div
         className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Dialog container */}
-      <div className="flex min-h-full items-center justify-center p-2 sm:p-4 text-center">
+      <div className="relative z-10 flex min-h-full items-center justify-center p-2 sm:p-4 text-center pointer-events-none">
         <div
-          className={`w-full ${maxWidthStyles} flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] transform rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-200/80 my-auto overflow-hidden`}
+          className={`relative w-full ${maxWidthStyles} flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] transform rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-200/80 my-auto overflow-hidden pointer-events-auto`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

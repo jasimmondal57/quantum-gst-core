@@ -60,8 +60,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-[#e2ebe5]">
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Dialog container */}
+      <div className="relative z-10 flex min-h-full items-center justify-center p-2 sm:p-4 text-center pointer-events-none">
+        <div
+          className="relative bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-[#e2ebe5] text-left pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Preview Control Header */}
         <div className="p-4 bg-[#f5f8f6] border-b border-[#e2ebe5] flex items-center justify-between no-print">
           <div className="flex items-center gap-3">
@@ -382,5 +394,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
         </div>
       </div>
     </div>
+  </div>
   );
 };
