@@ -373,17 +373,11 @@ class GstReportController extends Controller
      */
     public function gstr2bReconcile(Request $request, Gstr2bReconciliationService $service)
     {
-        $validated = $request->validate([
-            'business_id' => 'required|uuid|exists:businesses,id',
-            'return_period' => 'required|string|regex:/^\d{4}-\d{2}$/', // e.g. '2026-11'
-            'gstr2b_data' => 'required|array',
-        ]);
-
         $user = $request->user('sanctum') ?? $request->user();
-        if ($user) {
+        if ($user && $request->filled('business_id')) {
             $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
             $allowed = DB::table('businesses')
-                ->where('id', $validated['business_id'])
+                ->where('id', $request->input('business_id'))
                 ->whereIn('organization_id', $userOrgIds)
                 ->exists();
 
@@ -391,6 +385,12 @@ class GstReportController extends Controller
                 return response()->json(['message' => 'Unauthorized: Business does not belong to your organization.'], 403);
             }
         }
+
+        $validated = $request->validate([
+            'business_id' => 'required|uuid|exists:businesses,id',
+            'return_period' => 'required|string|regex:/^\d{4}-\d{2}$/', // e.g. '2026-11'
+            'gstr2b_data' => 'required|array',
+        ]);
 
         $result = $service->reconcile(
             businessId: $validated['business_id'],

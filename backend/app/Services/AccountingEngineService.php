@@ -308,6 +308,16 @@ class AccountingEngineService
     public function reverseInvoice(Invoice $invoice, string $reason = 'Cancelled by user'): JournalEntry
     {
         $bizId = $invoice->business_id;
+
+        // Idempotency check: Return existing reversal entry if already posted
+        $existing = JournalEntry::where('business_id', $bizId)
+            ->where('reference_type', 'invoice_cancellation')
+            ->where('reference_id', $invoice->id)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
         $this->ensureStandardChartOfAccounts($bizId);
 
         $arAccount = $this->getAccount($bizId, '1030'); // Sundry Debtors

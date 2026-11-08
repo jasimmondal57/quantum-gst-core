@@ -275,29 +275,35 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Cancel an issued invoice and post statutory double-entry reversal.
+     * Cancel an issued invoice and post statutory double-entry reversal with row-level locking.
      */
     public function cancel(Request $request, string $id)
     {
         $user = $request->user('sanctum') ?? $request->user();
-        $query = Invoice::with(['items', 'customer', 'businessGstin']);
-
-        if ($user) {
-            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
-            $query->whereIn('organization_id', $userOrgIds);
-        }
-
-        $invoice = $query->findOrFail($id);
-
-        if ($invoice->status === 'cancelled') {
-            return response()->json(['message' => 'Invoice is already cancelled.'], 400);
-        }
 
         $validated = $request->validate([
             'reason' => 'required|string|max:255',
         ]);
 
-        return DB::transaction(function () use ($invoice, $validated) {
+        return DB::transaction(function () use ($request, $id, $user, $validated) {
+            $query = Invoice::with(['items', 'customer', 'businessGstin']);
+
+            if ($user) {
+                $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+                $query->whereIn('organization_id', $userOrgIds);
+            }
+
+            $invoice = $query->where('id', $id)->lockForUpdate()->firstOrFail();
+
+            if ($invoice->status === 'cancelled') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Invoice is already cancelled.',
+                    'idempotent' => true,
+                    'invoice' => $invoice,
+                ], 200);
+            }
+
             $invoice->status = 'cancelled';
             $invoice->notes = ($invoice->notes ? $invoice->notes . "\n" : "") . "Cancelled on " . now()->toDateTimeString() . " - Reason: " . $validated['reason'];
             $invoice->save();

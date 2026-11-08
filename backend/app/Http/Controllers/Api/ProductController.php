@@ -5,17 +5,40 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
+    /**
+     * Tenant verification helper.
+     */
+    protected function authorizeBusiness(Request $request, string $businessId): void
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $allowed = DB::table('businesses')
+                ->where('id', $businessId)
+                ->whereIn('organization_id', $userOrgIds)
+                ->exists();
+
+            if (!$allowed) {
+                abort(403, 'Unauthorized: Business does not belong to your organization.');
+            }
+        }
+    }
+
     public function index(Request $request)
     {
         $businessId = $request->query('business_id');
 
-        $query = Product::with('taxCategory');
-        if ($businessId) {
-            $query->where('business_id', $businessId);
+        if (!$businessId) {
+            abort(400, 'business_id query parameter is required.');
         }
+
+        $this->authorizeBusiness($request, $businessId);
+
+        $query = Product::with('taxCategory')->where('business_id', $businessId);
 
         return response()->json($query->latest()->get());
     }
@@ -33,6 +56,8 @@ class ProductController extends Controller
             'purchase_price' => 'nullable|numeric|min:0',
             'tax_inclusive' => 'nullable|boolean',
         ]);
+
+        $this->authorizeBusiness($request, $validated['business_id']);
 
         $product = Product::create($validated);
 

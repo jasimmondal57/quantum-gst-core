@@ -5,17 +5,40 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessGstin;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GstinController extends Controller
 {
+    /**
+     * Tenant verification helper.
+     */
+    protected function authorizeBusiness(Request $request, string $businessId): void
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $allowed = DB::table('businesses')
+                ->where('id', $businessId)
+                ->whereIn('organization_id', $userOrgIds)
+                ->exists();
+
+            if (!$allowed) {
+                abort(403, 'Unauthorized: Business does not belong to your organization.');
+            }
+        }
+    }
+
     public function index(Request $request)
     {
         $businessId = $request->query('business_id');
 
-        $query = BusinessGstin::query();
-        if ($businessId) {
-            $query->where('business_id', $businessId);
+        if (!$businessId) {
+            abort(400, 'business_id query parameter is required.');
         }
+
+        $this->authorizeBusiness($request, $businessId);
+
+        $query = BusinessGstin::where('business_id', $businessId);
 
         return response()->json($query->orderByDesc('is_primary')->get());
     }
@@ -35,6 +58,8 @@ class GstinController extends Controller
             'pincode' => 'nullable|string|size:6',
             'is_primary' => 'nullable|boolean',
         ]);
+
+        $this->authorizeBusiness($request, $validated['business_id']);
 
         $validated['gstin'] = strtoupper($validated['gstin']);
 

@@ -124,6 +124,10 @@ class AccountingController extends Controller
      */
     public function postJournalEntry(Request $request)
     {
+        if ($request->filled('business_id')) {
+            $this->authorizeBusiness($request, $request->input('business_id'));
+        }
+
         $validated = $request->validate([
             'business_id' => 'required|uuid|exists:businesses,id',
             'entry_date' => 'required|date',
@@ -136,8 +140,6 @@ class AccountingController extends Controller
             'lines.*.credit' => 'required|numeric|min:0',
             'lines.*.description' => 'nullable|string|max:255',
         ]);
-
-        $this->authorizeBusiness($request, $validated['business_id']);
 
         $entry = $this->accountingService->postJournalEntry(
             businessId: $validated['business_id'],

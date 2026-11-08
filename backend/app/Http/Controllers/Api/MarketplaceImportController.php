@@ -119,9 +119,18 @@ class MarketplaceImportController extends Controller
 
     public function orders(Request $request)
     {
+        $user = $request->user('sanctum') ?? $request->user();
         $businessId = $request->query('business_id');
 
         $query = MarketplaceOrder::with('marketplaceConnection');
+
+        if ($user) {
+            $userOrgIds = $user->organizations()->pluck('organizations.id')->toArray();
+            $query->whereHas('marketplaceConnection.business', function ($q) use ($userOrgIds) {
+                $q->whereIn('organization_id', $userOrgIds);
+            });
+        }
+
         if ($businessId) {
             $this->authorizeBusiness($request, $businessId);
             $query->whereHas('marketplaceConnection', function ($q) use ($businessId) {
