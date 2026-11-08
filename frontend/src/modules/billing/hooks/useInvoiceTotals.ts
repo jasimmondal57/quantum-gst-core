@@ -86,8 +86,16 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
       }
       if (itemDiscount > gross) itemDiscount = gross;
 
-      const taxableValue = round2(gross - itemDiscount);
-      subtotal += gross;
+      const grossLessDiscount = round2(gross - itemDiscount);
+      let taxableValue = grossLessDiscount;
+
+      // Extract taxable base if rate is tax-inclusive as per GST statutory reverse calculation
+      if (item.tax_inclusive && !isZeroRated && item.gst_rate > 0) {
+        const totalTaxPercent = item.gst_rate + (item.cess_rate || 0);
+        taxableValue = round2((grossLessDiscount * 100) / (100 + totalTaxPercent));
+      }
+
+      subtotal += item.tax_inclusive ? taxableValue : gross;
       totalItemDiscount += itemDiscount;
 
       let cgstRate = 0;

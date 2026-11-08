@@ -13,6 +13,13 @@ class Product extends Model
 
     protected $guarded = [];
 
+    protected $appends = ['gst_rate'];
+
+    public function getGstRateAttribute()
+    {
+        return (float) ($this->taxCategory?->igst_rate ?? 18.0);
+    }
+
     public function business()
     {
         return $this->belongsTo(Business::class);

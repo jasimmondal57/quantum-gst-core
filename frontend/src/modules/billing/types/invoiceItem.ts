@@ -10,6 +10,7 @@ export interface InvoiceItemDraft {
   quantity: number;
   unit: string;
   unit_price: number;
+  tax_inclusive?: boolean;
   discount_type: "percentage" | "fixed";
   discount_value: number;
   taxable_value: number;

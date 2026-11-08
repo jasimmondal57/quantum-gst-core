@@ -46,7 +46,7 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
 }) => {
   const [name, setName] = useState(initialName);
   const [type, setType] = useState<"goods" | "service">("goods");
-  const [hsnSac, setHsnSac] = useState("84713010");
+  const [hsnSac, setHsnSac] = useState("");
   const [unit, setUnit] = useState("NOS");
   const [salePrice, setSalePrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
@@ -61,11 +61,11 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
     if (isOpen) {
       setName(initialName);
       setErrorMsg("");
-      if (type === "goods" && (!hsnSac || hsnSac === "9983")) {
-        setHsnSac("84713010");
+      if (!hsnSac) {
+        setHsnSac(type === "service" ? "9983" : "");
       }
     }
-  }, [isOpen, initialName]);
+  }, [isOpen, initialName, type]);
 
   const handleTypeChange = (newType: "goods" | "service") => {
     setType(newType);
@@ -73,7 +73,7 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
       setHsnSac("9983");
       setUnit("HRS");
     } else {
-      setHsnSac("84713010");
+      setHsnSac("");
       setUnit("NOS");
     }
   };
@@ -114,11 +114,16 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
         purchase_price: purchasePrice && !isNaN(Number(purchasePrice)) ? parseFloat(purchasePrice) : undefined,
         sku: sku.trim() || undefined,
         tax_inclusive: taxInclusive,
+        gst_rate: parseFloat(gstRate) || 0,
       };
 
       const saved = await api.createProduct(payload);
 
-      const parsedGstRate = parseFloat(gstRate) || 18;
+      // Confirm GST rate directly from the saved backend record (taxCategory relationship or appended field)
+      const confirmedGstRate = typeof saved.gst_rate === "number"
+        ? saved.gst_rate
+        : (saved.tax_category ? parseFloat(saved.tax_category.igst_rate) : (parseFloat(gstRate) || 18));
+
       const createdProd: Product = {
         id: saved.id,
         business_id: saved.business_id,
@@ -132,8 +137,8 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
         sale_price: String(saved.sale_price),
         selling_price: parseFloat(saved.sale_price),
         purchase_price: saved.purchase_price ? String(saved.purchase_price) : undefined,
-        tax_inclusive: saved.tax_inclusive,
-        gst_rate: parsedGstRate,
+        tax_inclusive: !!saved.tax_inclusive,
+        gst_rate: confirmedGstRate,
         current_stock: 0,
       };
 
@@ -209,7 +214,7 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
           <div className="md:col-span-2">
             <Input
               label="Product or Service Name *"
-              placeholder="e.g. Dell Latitude 7420 Laptop / Web Development Consulting"
+              placeholder="e.g. Basmati Rice / Industrial Machinery / Legal Consulting"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -220,7 +225,7 @@ export const ProductQuickCreate: React.FC<ProductQuickCreateProps> = ({
           <div>
             <Input
               label={`${type === "goods" ? "HSN" : "SAC"} Code (Up to 8 digits) *`}
-              placeholder={type === "goods" ? "84713010" : "998311"}
+              placeholder={type === "goods" ? "e.g. 1006, 8471" : "e.g. 9983"}
               value={hsnSac}
               onChange={(e) => setHsnSac(e.target.value.replace(/\s+/g, ""))}
               maxLength={8}

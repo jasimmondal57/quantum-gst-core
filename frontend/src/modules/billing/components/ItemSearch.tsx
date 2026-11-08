@@ -62,10 +62,20 @@ export const ItemSearch: React.FC<ItemSearchProps> = ({
         top = Math.max(10, rect.top - 240);
       }
 
+      const screenPadding = 8;
+      const width = Math.min(Math.max(rect.width, 340), window.innerWidth - screenPadding * 2);
+      let left = rect.left;
+      if (left + width > window.innerWidth - screenPadding) {
+        left = window.innerWidth - width - screenPadding;
+      }
+      if (left < screenPadding) {
+        left = screenPadding;
+      }
+
       setCoords({
         top,
-        left: Math.max(8, rect.left),
-        width: Math.max(rect.width, 360),
+        left,
+        width,
       });
     }
   }, []);
@@ -114,6 +124,7 @@ export const ItemSearch: React.FC<ItemSearchProps> = ({
       unit: p.unit || "NOS",
       unit_price: rate,
       gst_rate: gst,
+      tax_inclusive: !!p.tax_inclusive,
     });
     setIsOpen(false);
     setHighlightedIndex(-1);

@@ -68,9 +68,30 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
       return;
     }
 
-    if (gstin.trim() && gstin.trim().length !== 15) {
-      setErrorMsg("Statutory GSTIN must be exactly 15 alphanumeric characters");
-      return;
+    const cleanGstin = gstin.trim().toUpperCase();
+    const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    if (cleanGstin) {
+      if (!GSTIN_REGEX.test(cleanGstin)) {
+        setErrorMsg("Invalid GSTIN structure. Expected: 2-digit State code + 10-char PAN + 1-char Entity + 'Z' + 1 Check digit (e.g. 27AABCU9603R1ZM)");
+        return;
+      }
+
+      const gstinState = cleanGstin.substring(0, 2);
+      if (gstinState !== stateCode) {
+        setErrorMsg(`GSTIN state prefix (${gstinState}) does not match the selected State (${stateCode} - ${stateName}). Please select matching state.`);
+        return;
+      }
+
+      if (registrationType === "unregistered") {
+        setErrorMsg("Unregistered party cannot hold a GSTIN. Please change Registration Category to 'Regular' or clear the GSTIN.");
+        return;
+      }
+    } else {
+      if (registrationType === "regular" || registrationType === "composition" || registrationType === "sez") {
+        setErrorMsg(`GSTIN is statutory mandatory for ${registrationType.toUpperCase()} registered business entities.`);
+        return;
+      }
     }
 
     if (pincode.trim() && pincode.trim().length !== 6) {

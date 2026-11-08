@@ -39,9 +39,21 @@ export const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
   } else {
     discountAmount = item.discount_value || 0;
   }
-  const taxable = Math.max(0, gross - discountAmount);
-  const taxAmount = (taxable * (item.gst_rate || 0)) / 100;
-  const rowTotal = taxable + taxAmount;
+  const grossLessDiscount = Math.max(0, gross - discountAmount);
+
+  let taxable = grossLessDiscount;
+  let taxAmount = 0;
+  let rowTotal = 0;
+
+  if (item.tax_inclusive && (item.gst_rate || 0) > 0) {
+    taxable = (grossLessDiscount * 100) / (100 + (item.gst_rate || 0));
+    taxAmount = grossLessDiscount - taxable;
+    rowTotal = grossLessDiscount;
+  } else {
+    taxable = grossLessDiscount;
+    taxAmount = (taxable * (item.gst_rate || 0)) / 100;
+    rowTotal = taxable + taxAmount;
+  }
 
   return (
     <>
@@ -101,17 +113,31 @@ export const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
           </select>
         </td>
 
-        {/* Rate (Unit Price) */}
-        <td className="p-2 w-28">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={item.unit_price || ""}
-            onChange={(e) => onUpdate({ unit_price: parseFloat(e.target.value) || 0 })}
-            placeholder="0.00"
-            className="w-full text-xs rounded border border-[#e2ebe5] px-2 py-1.5 bg-white text-[#172b25] text-right font-medium focus:outline-none focus:border-[#167a55]"
-          />
+        {/* Rate (Unit Price) & Tax-Inclusive toggle */}
+        <td className="p-2 w-32">
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={item.unit_price || ""}
+              onChange={(e) => onUpdate({ unit_price: parseFloat(e.target.value) || 0 })}
+              placeholder="0.00"
+              className="w-full text-xs rounded border border-[#e2ebe5] pl-2 pr-9 py-1.5 bg-white text-[#172b25] text-right font-medium focus:outline-none focus:border-[#167a55]"
+            />
+            <button
+              type="button"
+              onClick={() => onUpdate({ tax_inclusive: !item.tax_inclusive })}
+              title={item.tax_inclusive ? "Rate is Tax-Inclusive (Click to switch to Excl)" : "Rate is Tax-Exclusive (Click to switch to Incl)"}
+              className={`absolute right-1 top-1 bottom-1 px-1 text-[9px] font-bold rounded flex items-center justify-center transition-colors cursor-pointer ${
+                item.tax_inclusive
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              {item.tax_inclusive ? "Inc" : "Exc"}
+            </button>
+          </div>
         </td>
 
         {/* Discount */}

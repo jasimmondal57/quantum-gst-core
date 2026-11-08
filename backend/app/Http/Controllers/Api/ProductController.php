@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\TaxCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -55,11 +56,28 @@ class ProductController extends Controller
             'sale_price' => 'required|numeric|min:0',
             'purchase_price' => 'nullable|numeric|min:0',
             'tax_inclusive' => 'nullable|boolean',
+            'gst_rate' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $this->authorizeBusiness($request, $validated['business_id']);
 
+        $gstRate = isset($validated['gst_rate']) ? (float) $validated['gst_rate'] : 18.0;
+        $halfRate = round($gstRate / 2, 3);
+        $taxCategory = TaxCategory::firstOrCreate(
+            ['igst_rate' => $gstRate],
+            [
+                'name' => "GST {$gstRate}%",
+                'cgst_rate' => $halfRate,
+                'sgst_rate' => $halfRate,
+                'supply_type' => $gstRate == 0.0 ? 'exempt' : 'taxable',
+                'is_system' => true,
+            ]
+        );
+        $validated['tax_category_id'] = $taxCategory->id;
+        unset($validated['gst_rate']);
+
         $product = Product::create($validated);
+        $product->load('taxCategory');
 
         return response()->json($product, 201);
     }

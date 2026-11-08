@@ -1,6 +1,8 @@
-import React from "react";
-import { Plus, Barcode, PackagePlus, Layers } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Barcode, PackagePlus, Layers, ListPlus, Search, CheckSquare, Square } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Modal } from "../../../components/ui/Modal";
+import { Badge } from "../../../components/ui/Badge";
 import type { InvoiceItemDraft } from "../types/invoiceItem";
 import type { Product } from "../../../services/api";
 import { InvoiceItemRow } from "./InvoiceItemRow";
@@ -24,6 +26,71 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
   onRemoveItem,
   onProductCreated,
 }) => {
+  const [showBulkPicker, setShowBulkPicker] = useState(false);
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({});
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedQuantities((prev) => {
+      const next = { ...prev };
+      if (next[productId]) {
+        delete next[productId];
+      } else {
+        next[productId] = 1;
+      }
+      return next;
+    });
+  };
+
+  const updateQuantity = (productId: string, qty: number) => {
+    setSelectedQuantities((prev) => ({
+      ...prev,
+      [productId]: Math.max(1, qty),
+    }));
+  };
+
+  const handleConfirmBulkAdd = () => {
+    const selectedIds = Object.keys(selectedQuantities);
+    if (selectedIds.length === 0) return;
+
+    selectedIds.forEach((id) => {
+      const match = products.find((p) => p.id === id);
+      if (match) {
+        const rate = typeof match.selling_price === "string"
+          ? parseFloat(match.selling_price)
+          : (match.selling_price ?? (typeof match.sale_price === "string" ? parseFloat(match.sale_price) : 0));
+        const gst = typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18);
+
+        onAddItem({
+          product_id: match.id,
+          item_name: match.name,
+          sku: match.sku || "",
+          hsn_sac: match.hsn_code || match.hsn_sac || "9983",
+          unit: match.unit || "NOS",
+          quantity: selectedQuantities[id] || 1,
+          unit_price: rate,
+          gst_rate: gst,
+          tax_inclusive: !!match.tax_inclusive,
+        });
+      }
+    });
+
+    setSelectedQuantities({});
+    setShowBulkPicker(false);
+  };
+
+  const filteredCatalog = products.filter((p) => {
+    if (!bulkSearch.trim()) return true;
+    const term = bulkSearch.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(term) ||
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.hsn_sac && p.hsn_sac.includes(term))
+    );
+  });
+
+  const selectedCount = Object.keys(selectedQuantities).length;
+
   return (
     <div className="bg-white border border-[#e2ebe5] rounded-xl overflow-hidden shadow-sm space-y-0">
       <div className="p-3 bg-[#f5f8f6] border-b border-[#e2ebe5] flex items-center justify-between flex-wrap gap-2">
@@ -38,6 +105,18 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {products.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkPicker(true)}
+              icon={<ListPlus className="w-3.5 h-3.5" />}
+            >
+              Bulk Add Items
+            </Button>
+          )}
+
           <Button
             type="button"
             variant="outline"
@@ -47,13 +126,17 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
               if (barcode) {
                 const match = products.find((p) => p.sku === barcode || p.barcode === barcode);
                 if (match) {
+                  const rate = typeof match.selling_price === "string" ? parseFloat(match.selling_price) : (match.selling_price || 0);
+                  const gst = typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18);
                   onAddItem({
                     product_id: match.id,
                     item_name: match.name,
                     sku: match.sku || "",
-                    hsn_sac: match.hsn_code || "9983",
-                    unit_price: typeof match.selling_price === "string" ? parseFloat(match.selling_price) : (match.selling_price || 0),
-                    gst_rate: typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18),
+                    hsn_sac: match.hsn_code || match.hsn_sac || "9983",
+                    unit: match.unit || "NOS",
+                    unit_price: rate,
+                    gst_rate: gst,
+                    tax_inclusive: !!match.tax_inclusive,
                   });
                 } else {
                   alert(`No product found with barcode: ${barcode}`);
@@ -86,7 +169,7 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
               <th className="p-2 w-24 text-center">HSN/SAC</th>
               <th className="p-2 w-20 text-right">Qty</th>
               <th className="p-2 w-20 text-center">Unit</th>
-              <th className="p-2 w-28 text-right">Rate (₹)</th>
+              <th className="p-2 w-32 text-right">Rate (₹)</th>
               <th className="p-2 w-24 text-right">Discount</th>
               <th className="p-2 w-24 text-right">Taxable (₹)</th>
               <th className="p-2 w-24 text-center">GST Rate</th>
@@ -128,6 +211,123 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
           Pro-tip: Press <kbd className="shortcut-kbd">F3</kbd> anytime to append a new item row.
         </span>
       </div>
+
+      {/* Bulk Item Selection Modal (Zoho Books Style) */}
+      <Modal
+        isOpen={showBulkPicker}
+        onClose={() => setShowBulkPicker(false)}
+        title="Bulk Add Items from Catalog"
+        subtitle={`Select multiple catalog items to append to invoice (${products.length} products available)`}
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-xs font-medium text-slate-600">
+              {selectedCount} item{selectedCount === 1 ? "" : "s"} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowBulkPicker(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={selectedCount === 0}
+                onClick={handleConfirmBulkAdd}
+              >
+                Add {selectedCount} Item{selectedCount === 1 ? "" : "s"} to Invoice
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Filter products by name, SKU, or HSN code..."
+              value={bulkSearch}
+              onChange={(e) => setBulkSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#167a55]"
+            />
+          </div>
+
+          <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto divide-y divide-slate-100">
+            {filteredCatalog.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500">
+                No catalog items match your search.
+              </div>
+            ) : (
+              filteredCatalog.map((prod) => {
+                const isSelected = !!selectedQuantities[prod.id];
+                const qty = selectedQuantities[prod.id] || 1;
+                const price = typeof prod.selling_price === "string"
+                  ? parseFloat(prod.selling_price)
+                  : (prod.selling_price ?? (typeof prod.sale_price === "string" ? parseFloat(prod.sale_price) : 0));
+                const gst = typeof prod.gst_rate === "string" ? parseFloat(prod.gst_rate) : (prod.gst_rate ?? 18);
+
+                return (
+                  <div
+                    key={prod.id}
+                    className={`p-3 flex items-center justify-between gap-3 transition-colors ${
+                      isSelected ? "bg-emerald-50/60" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <div
+                      className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+                      onClick={() => toggleSelectProduct(prod.id)}
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-[#167a55] shrink-0" />
+                      ) : (
+                        <Square className="w-5 h-5 text-slate-300 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 truncate">{prod.name}</span>
+                          {prod.sku && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                              SKU: {prod.sku}
+                            </span>
+                          )}
+                          <Badge variant="outline" size="sm">
+                            HSN: {prod.hsn_code || prod.hsn_sac || "9983"}
+                          </Badge>
+                          <Badge variant="emerald" size="sm">
+                            GST: {gst}%
+                          </Badge>
+                          {prod.tax_inclusive && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">
+                              Tax-Inclusive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Rate: ₹{price.toFixed(2)} / {prod.unit || "NOS"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[11px] text-slate-500 font-medium">Qty:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={qty}
+                          onChange={(e) => updateQuantity(prod.id, parseFloat(e.target.value) || 1)}
+                          className="w-16 text-xs text-center border border-slate-300 rounded px-1.5 py-1 bg-white focus:outline-none focus:border-[#167a55]"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
