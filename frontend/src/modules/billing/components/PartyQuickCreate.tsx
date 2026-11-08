@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Modal } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
-import { Input } from "../../../components/ui/Input";
+import { Input, Select, Textarea } from "../../../components/ui/Input";
 import { api } from "../../../services/api";
 import type { Party } from "../types/party";
 import { INDIAN_STATES } from "./DocumentDetails";
@@ -94,6 +94,13 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
     const cleanGstin = gstin.trim().toUpperCase();
     const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
+    if (registrationType === "overseas") {
+      if (cleanGstin) {
+        setErrorMsg("Overseas / foreign parties cannot hold an Indian domestic GSTIN. If this is a domestic Indian entity, please change Registration Category to 'Regular GST Registered'.");
+        return;
+      }
+    }
+
     if (cleanGstin) {
       if (!GSTIN_REGEX.test(cleanGstin)) {
         setErrorMsg("Invalid GSTIN structure. Expected: 2-digit State code + 10-char PAN + 1-char Entity + 'Z' + 1 Check digit (e.g. 27AABCU9603R1ZM)");
@@ -101,7 +108,7 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
       }
 
       const gstinState = cleanGstin.substring(0, 2);
-      if (gstinState !== stateCode && registrationType !== "overseas") {
+      if (gstinState !== stateCode) {
         setErrorMsg(`GSTIN state prefix (${gstinState}) does not match the selected State (${stateCode} - ${stateName}). Please select matching state.`);
         return;
       }
@@ -167,7 +174,7 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
         trade_name: saved.company_name,
         party_type: partyType,
         gstin: saved.gstin,
-        registration_type: saved.gstin ? registrationType : "unregistered",
+        registration_type: registrationType,
         phone: saved.phone,
         email: saved.email,
         billing_address: saved.billing_address,
@@ -251,13 +258,10 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#172b25] mb-1.5">
-              GST Registration Category
-            </label>
-            <select
+            <Select
+              label="GST Registration Category"
               value={registrationType}
               onChange={(e) => handleRegistrationTypeChange(e.target.value as Party["registration_type"])}
-              className="w-full text-xs rounded-lg border border-[#e2ebe5] px-3 py-2 bg-white text-[#172b25] focus:outline-none focus:border-[#167a55]"
             >
               <option value="regular">Regular GST Registered (B2B)</option>
               <option value="consumer">Consumer (B2C - Direct Customer)</option>
@@ -265,7 +269,7 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
               <option value="unregistered">Unregistered Business</option>
               <option value="sez">Special Economic Zone (SEZ)</option>
               <option value="overseas">Overseas Export / Non-Resident</option>
-            </select>
+            </Select>
           </div>
 
           <div>
@@ -289,20 +293,18 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#172b25] mb-1.5">
-              Place of Supply / State *
-            </label>
-            <select
+            <Select
+              label="Place of Supply / State *"
               value={stateCode}
               onChange={(e) => handleStateChange(e.target.value)}
-              className="w-full text-xs rounded-lg border border-[#e2ebe5] px-3 py-2 bg-white text-[#172b25] focus:outline-none focus:border-[#167a55]"
+              required
             >
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
@@ -316,15 +318,12 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-[#172b25] mb-1.5">
-              Complete Billing Address
-            </label>
-            <textarea
+            <Textarea
+              label="Complete Billing Address"
               rows={2}
               placeholder="Plot No 42, Maker Chambers IV, Nariman Point, Mumbai"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              className="w-full text-xs rounded-lg border border-[#e2ebe5] p-2.5 bg-white text-[#172b25] focus:outline-none focus:border-[#167a55]"
             />
           </div>
         </div>

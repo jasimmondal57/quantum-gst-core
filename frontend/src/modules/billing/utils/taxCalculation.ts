@@ -9,6 +9,10 @@ export interface CalculatedItemRow {
   rowTotal: number;
 }
 
+export function round2(num: number): number {
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
 /**
  * Statutory GST and Cess calculation helper for single line items.
  * Handles both Tax-Exclusive (forward) and Tax-Inclusive (backward reverse-extraction) modes.
@@ -25,22 +29,22 @@ export function calculateItemRowTaxes(item: {
 }): CalculatedItemRow {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.unit_price) || 0;
-  const gross = Math.round(qty * rate * 100) / 100;
+  const gross = round2(qty * rate);
 
   let itemDiscount = 0;
   const discVal = Number(item.discount_value) || 0;
   if (item.discount_type === "percentage") {
-    itemDiscount = Math.round(((gross * discVal) / 100) * 100) / 100;
+    itemDiscount = round2((gross * discVal) / 100);
   } else {
-    itemDiscount = Math.round(discVal * 100) / 100;
+    itemDiscount = round2(discVal);
   }
   if (itemDiscount > gross) itemDiscount = gross;
 
-  const grossLessDiscount = Math.round((gross - itemDiscount) * 100) / 100;
+  const grossLessDiscount = round2(gross - itemDiscount);
   const gstRate = Number(item.gst_rate) || 0;
   const cessRate = Number(item.cess_rate) || 0;
   const cessSpecificPerUnit = Number(item.cess_specific) || 0;
-  const specificCessTotal = Math.round(qty * cessSpecificPerUnit * 100) / 100;
+  const specificCessTotal = round2(qty * cessSpecificPerUnit);
 
   let taxableValue = 0;
   let gstAmount = 0;
@@ -51,21 +55,21 @@ export function calculateItemRowTaxes(item: {
     // Deduct specific cess from gross before applying statutory ad-valorem formula
     const grossLessSpecific = Math.max(0, grossLessDiscount - specificCessTotal);
     const totalRate = gstRate + cessRate;
-    taxableValue = Math.round(((grossLessSpecific * 100) / (100 + totalRate)) * 100) / 100;
-    gstAmount = Math.round(((taxableValue * gstRate) / 100) * 100) / 100;
-    adValoremCess = Math.round(((taxableValue * cessRate) / 100) * 100) / 100;
+    taxableValue = round2((grossLessSpecific * 100) / (100 + totalRate));
+    gstAmount = round2((taxableValue * gstRate) / 100);
+    adValoremCess = round2((taxableValue * cessRate) / 100);
   } else {
     // Forward tax addition:
     taxableValue = grossLessDiscount;
-    gstAmount = Math.round(((taxableValue * gstRate) / 100) * 100) / 100;
-    adValoremCess = Math.round(((taxableValue * cessRate) / 100) * 100) / 100;
+    gstAmount = round2((taxableValue * gstRate) / 100);
+    adValoremCess = round2((taxableValue * cessRate) / 100);
   }
 
-  const cessAmount = Math.round((adValoremCess + specificCessTotal) * 100) / 100;
-  const totalTax = Math.round((gstAmount + cessAmount) * 100) / 100;
+  const cessAmount = round2(adValoremCess + specificCessTotal);
+  const totalTax = round2(gstAmount + cessAmount);
   const rowTotal = item.tax_inclusive
     ? grossLessDiscount
-    : Math.round((taxableValue + totalTax) * 100) / 100;
+    : round2(taxableValue + totalTax);
 
   return {
     gross,
@@ -78,4 +82,3 @@ export function calculateItemRowTaxes(item: {
     rowTotal,
   };
 }
-

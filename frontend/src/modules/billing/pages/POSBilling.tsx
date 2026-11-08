@@ -92,11 +92,13 @@ export const POSBilling: React.FC<POSBillingProps> = ({
         {
           product_id: product.id,
           item_name: product.name,
-          hsn_sac: product.hsn_code || "9983",
+          hsn_sac: product.hsn_code || product.hsn_sac || "",
           quantity: 1,
           unit: product.unit || "NOS",
           unit_price: typeof product.selling_price === "string" ? parseFloat(product.selling_price) : (product.selling_price || 0),
-          gst_rate: typeof product.gst_rate === "string" ? parseFloat(product.gst_rate) : (product.gst_rate ?? 18),
+          gst_rate: typeof product.gst_rate === "number"
+            ? product.gst_rate
+            : (typeof product.gst_rate === "string" && !isNaN(parseFloat(product.gst_rate)) ? parseFloat(product.gst_rate) : 0),
           discount_percent: 0,
         },
       ];
@@ -279,9 +281,9 @@ export const POSBilling: React.FC<POSBillingProps> = ({
                           {product.name}
                         </span>
                         <div className="flex items-center justify-between text-[10px] text-[#71817a] mt-1">
-                          <span>HSN: {product.hsn_code || "9983"}</span>
+                          <span>HSN: {product.hsn_code || product.hsn_sac || "Unspecified"}</span>
                           <span className="bg-[#f5f8f6] px-1 py-0.5 rounded font-mono">
-                            GST {product.gst_rate}%
+                            GST {product.gst_rate !== undefined && product.gst_rate !== null ? `${product.gst_rate}%` : "Not Set"}
                           </span>
                         </div>
                       </div>

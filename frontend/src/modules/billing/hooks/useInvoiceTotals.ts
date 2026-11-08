@@ -69,16 +69,13 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
 
     const isUtgst = !isInterstate && UT_STATE_CODES.includes(businessStateCode);
 
-    let subtotal = 0;
+    // Pass 1: Line Item Base Calculations (Zero Double Deduction)
+    let grossSubtotal = 0;
     let totalItemDiscount = 0;
-    let totalCgst = 0;
-    let totalSgst = 0;
-    let totalUtgst = 0;
-    let totalIgst = 0;
-    let totalCess = 0;
+    let unadjustedTaxableTotal = 0;
 
-    const calculatedItems = items.map((item) => {
-      const rowCalc = calculateItemRowTaxes({
+    const rowCalcs = items.map((item) => {
+      const calc = calculateItemRowTaxes({
         quantity: item.quantity,
         unit_price: item.unit_price,
         discount_type: item.discount_type,
@@ -89,9 +86,62 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
         cess_specific: isZeroRated ? 0 : item.cess_specific,
       });
 
-      const { gross, itemDiscount, taxableValue, cessAmount, gstAmount } = rowCalc;
-      subtotal += item.tax_inclusive ? taxableValue : gross;
-      totalItemDiscount += itemDiscount;
+      grossSubtotal += calc.gross;
+      totalItemDiscount += calc.itemDiscount;
+      unadjustedTaxableTotal += calc.taxableValue;
+
+      return calc;
+    });
+
+    grossSubtotal = round2(grossSubtotal);
+    totalItemDiscount = round2(totalItemDiscount);
+    unadjustedTaxableTotal = round2(unadjustedTaxableTotal);
+
+    // Calculate invoice-level discount on unadjusted taxable base
+    let invoiceDiscountAmount = 0;
+    if (invoiceDiscountType === "percentage") {
+      invoiceDiscountAmount = round2((unadjustedTaxableTotal * (invoiceDiscountValue || 0)) / 100);
+    } else {
+      invoiceDiscountAmount = round2(invoiceDiscountValue || 0);
+    }
+    if (invoiceDiscountAmount > unadjustedTaxableTotal) {
+      invoiceDiscountAmount = unadjustedTaxableTotal;
+    }
+
+    // Pass 2: Proportionally allocate invoice discount across lines and compute statutory taxes
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalUtgst = 0;
+    let totalIgst = 0;
+    let totalCess = 0;
+    let remainingDiscountToAllocate = invoiceDiscountAmount;
+
+    const calculatedItems = items.map((item, idx) => {
+      const baseCalc = rowCalcs[idx];
+      let lineDiscountAllocated = 0;
+
+      if (invoiceDiscountAmount > 0 && unadjustedTaxableTotal > 0) {
+        if (idx === items.length - 1) {
+          // Last line absorbs any 1-paisa rounding difference
+          lineDiscountAllocated = round2(remainingDiscountToAllocate);
+        } else {
+          lineDiscountAllocated = round2(
+            (baseCalc.taxableValue / unadjustedTaxableTotal) * invoiceDiscountAmount
+          );
+          if (lineDiscountAllocated > remainingDiscountToAllocate) {
+            lineDiscountAllocated = remainingDiscountToAllocate;
+          }
+          remainingDiscountToAllocate = round2(remainingDiscountToAllocate - lineDiscountAllocated);
+        }
+      }
+
+      const adjustedTaxableValue = round2(Math.max(0, baseCalc.taxableValue - lineDiscountAllocated));
+
+      // Calculate taxes on adjusted taxable value
+      const gstRate = isZeroRated ? 0 : (Number(item.gst_rate) || 0);
+      const cessRate = isZeroRated ? 0 : (Number(item.cess_rate) || 0);
+      const cessSpecificPerUnit = isZeroRated ? 0 : (Number(item.cess_specific) || 0);
+      const specificCess = round2((Number(item.quantity) || 0) * cessSpecificPerUnit);
 
       let cgstRate = 0;
       let cgstAmt = 0;
@@ -101,85 +151,93 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
       let utgstAmt = 0;
       let igstRate = 0;
       let igstAmt = 0;
+      let adValoremCess = 0;
 
-      if (!isZeroRated && taxableValue > 0) {
+      if (!isZeroRated && adjustedTaxableValue > 0) {
+        const lineTax = round2((adjustedTaxableValue * gstRate) / 100);
+
         if (isInterstate) {
-          igstRate = item.gst_rate;
-          igstAmt = gstAmount;
+          igstRate = gstRate;
+          igstAmt = lineTax;
           totalIgst += igstAmt;
         } else if (isUtgst) {
-          cgstRate = round2(item.gst_rate / 2);
-          utgstRate = round2(item.gst_rate / 2);
-          cgstAmt = round2(gstAmount / 2);
-          utgstAmt = round2(gstAmount - cgstAmt);
+          cgstRate = round2(gstRate / 2);
+          utgstRate = round2(gstRate / 2);
+          cgstAmt = round2(lineTax / 2);
+          utgstAmt = round2(lineTax - cgstAmt);
           totalCgst += cgstAmt;
           totalUtgst += utgstAmt;
         } else {
-          cgstRate = round2(item.gst_rate / 2);
-          sgstRate = round2(item.gst_rate / 2);
-          cgstAmt = round2(gstAmount / 2);
-          sgstAmt = round2(gstAmount - cgstAmt);
+          cgstRate = round2(gstRate / 2);
+          sgstRate = round2(gstRate / 2);
+          cgstAmt = round2(lineTax / 2);
+          sgstAmt = round2(lineTax - cgstAmt);
           totalCgst += cgstAmt;
           totalSgst += sgstAmt;
         }
 
-        totalCess += cessAmount;
+        if (cessRate > 0) {
+          adValoremCess = round2((adjustedTaxableValue * cessRate) / 100);
+        }
       }
 
-      const totalTax = round2(cgstAmt + sgstAmt + utgstAmt + igstAmt + cessAmount);
-      const totalAmount = item.tax_inclusive ? rowCalc.grossLessDiscount : round2(taxableValue + totalTax);
+      const lineTotalCess = round2(adValoremCess + specificCess);
+      totalCess += lineTotalCess;
+
+      const totalLineTax = round2(cgstAmt + sgstAmt + utgstAmt + igstAmt + lineTotalCess);
+      const totalAmount = round2(adjustedTaxableValue + totalLineTax);
 
       return {
         ...item,
-        taxable_value: taxableValue,
+        taxable_value: adjustedTaxableValue,
         cgst_rate: cgstRate,
         cgst_amount: cgstAmt,
         sgst_rate: isUtgst ? utgstRate : sgstRate,
         sgst_amount: isUtgst ? utgstAmt : sgstAmt,
         igst_rate: igstRate,
         igst_amount: igstAmt,
-        cess_amount: cessAmount,
-        total_tax: totalTax,
+        cess_rate: cessRate,
+        cess_amount: lineTotalCess,
+        total_tax: totalLineTax,
         total_amount: totalAmount,
       };
     });
 
-    const itemsTaxableTotal = round2(subtotal - totalItemDiscount);
+    totalCgst = round2(totalCgst);
+    totalSgst = round2(totalSgst);
+    totalUtgst = round2(totalUtgst);
+    totalIgst = round2(totalIgst);
+    totalCess = round2(totalCess);
 
-    // Invoice-level discount
-    let invoiceDiscountAmount = 0;
-    if (invoiceDiscountType === "percentage") {
-      invoiceDiscountAmount = round2((itemsTaxableTotal * (invoiceDiscountValue || 0)) / 100);
-    } else {
-      invoiceDiscountAmount = round2(invoiceDiscountValue || 0);
-    }
-    if (invoiceDiscountAmount > itemsTaxableTotal) {
-      invoiceDiscountAmount = itemsTaxableTotal;
-    }
-
-    // Additional charges & taxes
+    // Process Additional Charges
     let chargesTotal = 0;
     let chargesTax = 0;
     additionalCharges.forEach((charge) => {
-      chargesTotal += round2(charge.amount || 0);
-      if (charge.is_taxable && charge.gst_rate > 0) {
-        const cTax = round2(((charge.amount || 0) * charge.gst_rate) / 100);
+      const chgAmt = round2(Number(charge.amount) || 0);
+      chargesTotal += chgAmt;
+
+      if (charge.is_taxable && Number(charge.gst_rate) > 0) {
+        const cTax = round2((chgAmt * Number(charge.gst_rate)) / 100);
         chargesTax += cTax;
+
         if (isInterstate) {
-          totalIgst += cTax;
+          totalIgst = round2(totalIgst + cTax);
         } else if (isUtgst) {
-          totalCgst += round2(cTax / 2);
-          totalUtgst += round2(cTax / 2);
+          const half = round2(cTax / 2);
+          totalCgst = round2(totalCgst + half);
+          totalUtgst = round2(totalUtgst + (cTax - half));
         } else {
-          totalCgst += round2(cTax / 2);
-          totalSgst += round2(cTax / 2);
+          const half = round2(cTax / 2);
+          totalCgst = round2(totalCgst + half);
+          totalSgst = round2(totalSgst + (cTax - half));
         }
       }
     });
 
-    const netTaxableAmount = round2(itemsTaxableTotal - invoiceDiscountAmount);
+    const netTaxableAmount = round2(unadjustedTaxableTotal - invoiceDiscountAmount);
     const totalTaxAmount = round2(totalCgst + totalSgst + totalUtgst + totalIgst + totalCess);
 
+    // In reverse charge, statutory tax is paid directly by recipient to govt; not collected on invoice
     const rawGrandTotal = round2(
       netTaxableAmount + (reverseCharge ? 0 : totalTaxAmount) + chargesTotal
     );
@@ -188,16 +246,16 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
     const roundOff = round2(roundedGrandTotal - rawGrandTotal);
 
     return {
-      subtotal: round2(subtotal),
-      totalItemDiscount: round2(totalItemDiscount),
-      invoiceDiscountAmount: round2(invoiceDiscountAmount),
+      subtotal: grossSubtotal,
+      totalItemDiscount,
+      invoiceDiscountAmount,
       taxableAmount: netTaxableAmount,
-      totalCgst: round2(totalCgst),
-      totalSgst: round2(totalSgst),
-      totalUtgst: round2(totalUtgst),
-      totalIgst: round2(totalIgst),
-      totalCess: round2(totalCess),
-      totalTaxAmount: round2(totalTaxAmount),
+      totalCgst,
+      totalSgst,
+      totalUtgst,
+      totalIgst,
+      totalCess,
+      totalTaxAmount,
       chargesTotal: round2(chargesTotal),
       chargesTax: round2(chargesTax),
       roundOff,

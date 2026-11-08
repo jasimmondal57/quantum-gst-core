@@ -73,6 +73,10 @@ class InvoiceController extends Controller
             'supply_type' => 'nullable|string',
             'place_of_supply_state_code' => 'required|string|size:2',
             'reverse_charge' => 'nullable|boolean',
+            'invoice_discount_type' => 'nullable|string|in:percentage,fixed',
+            'invoice_discount_value' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+            'terms_and_conditions' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|uuid|exists:products,id',
             'items.*.item_name' => 'required|string|max:255',
@@ -83,6 +87,9 @@ class InvoiceController extends Controller
             'items.*.gst_rate' => 'required|numeric|min:0|max:100',
             'items.*.cess_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.cess_specific' => 'nullable|numeric|min:0',
+            'items.*.discount_type' => 'nullable|string|in:percentage,fixed',
+            'items.*.discount_value' => 'nullable|numeric|min:0',
+            'items.*.tax_inclusive' => 'nullable|boolean',
         ]);
 
         // Multi-Tenant Isolation Check: Ensure the user belongs to the target organization
@@ -135,29 +142,84 @@ class InvoiceController extends Controller
 
             $isUtgst = $this->gstEngine->isUtgst($gstin->state_code);
 
-            // 1. Process line items through pure BCMath GST Engine
-            $calculatedItems = [];
+            // 1. Process line-level gross, line discounts, and base taxable
+            $preparedItems = [];
             foreach ($validated['items'] as $item) {
                 $qty = (string) $item['quantity'];
                 $unitPrice = (string) $item['unit_price'];
-                $taxable = bcmul($qty, $unitPrice, 4);
+                $gross = bcmul($qty, $unitPrice, 4);
+
+                $discType = $item['discount_type'] ?? 'percentage';
+                $discVal = (string) ($item['discount_value'] ?? '0');
+                $lineDiscount = '0.0000';
+
+                if (bccomp($discVal, '0', 4) > 0) {
+                    if ($discType === 'percentage') {
+                        $lineDiscount = bcdiv(bcmul($gross, $discVal, 4), '100', 4);
+                    } else {
+                        $lineDiscount = bcdiv($discVal, '1', 4);
+                    }
+                }
+                if (bccomp($lineDiscount, $gross, 4) > 0) {
+                    $lineDiscount = $gross;
+                }
+
+                $baseAmount = bcsub($gross, $lineDiscount, 4);
+
+                // If tax inclusive, reverse-extract base taxable
+                $isInclusive = !empty($item['tax_inclusive']);
+                if ($isInclusive) {
+                    $taxable = $this->gstEngine->extractTaxableFromInclusive(
+                        $baseAmount,
+                        (string) $item['gst_rate'],
+                        (string) ($item['cess_rate'] ?? '0'),
+                        (string) ($item['cess_specific'] ?? '0')
+                    );
+                } else {
+                    $taxable = bcdiv($baseAmount, '1', 2);
+                }
+
+                $preparedItems[] = array_merge($item, [
+                    'gross' => $gross,
+                    'line_discount' => $lineDiscount,
+                    'taxable_value' => $taxable,
+                ]);
+            }
+
+            // 2. Proportionally allocate invoice-level discount (Section 15(3) CGST Act)
+            $invDiscType = $validated['invoice_discount_type'] ?? 'fixed';
+            $invDiscVal = (string) ($validated['invoice_discount_value'] ?? '0');
+            $allocatedDiscounts = $this->gstEngine->allocateInvoiceDiscount($preparedItems, $invDiscType, $invDiscVal);
+
+            // 3. Compute item statutory taxes on net adjusted taxable value
+            $calculatedItems = [];
+            foreach ($preparedItems as $idx => $prepItem) {
+                $allocatedDisc = $allocatedDiscounts[$idx] ?? '0.00';
+                $netTaxable = bcsub((string) $prepItem['taxable_value'], $allocatedDisc, 2);
+                if (bccomp($netTaxable, '0', 2) < 0) {
+                    $netTaxable = '0.00';
+                }
+
+                $totalDiscountOnLine = bcadd((string) $prepItem['line_discount'], $allocatedDisc, 2);
 
                 $taxBreakdown = $this->gstEngine->calculateItemTaxes(
-                    taxableValue: $taxable,
-                    gstRate: (string) $item['gst_rate'],
+                    taxableValue: $netTaxable,
+                    gstRate: (string) $prepItem['gst_rate'],
                     isInterstate: $isInterstate,
                     isUtgst: $isUtgst,
-                    cessRate: (string) ($item['cess_rate'] ?? '0'),
-                    cessSpecific: (string) ($item['cess_specific'] ?? '0'),
+                    cessRate: (string) ($prepItem['cess_rate'] ?? '0'),
+                    cessSpecific: (string) ($prepItem['cess_specific'] ?? '0'),
                     supplyType: $supplyType,
                     isReverseCharge: (bool) ($validated['reverse_charge'] ?? false)
                 );
 
-                $calculatedItems[] = array_merge($item, $taxBreakdown);
+                $calculatedItems[] = array_merge($prepItem, $taxBreakdown, [
+                    'discount_amount' => $totalDiscountOnLine,
+                ]);
             }
 
-            // 2. Calculate document statutory totals
-            $totals = $this->gstEngine->calculateDocumentTotals($calculatedItems);
+            // 4. Calculate document statutory totals
+            $totals = $this->gstEngine->calculateDocumentTotals($calculatedItems, (bool) ($validated['reverse_charge'] ?? false));
 
             // 3. Sequential invoice numbering with financial year
             $invDate = Carbon::parse($validated['invoice_date']);
@@ -202,6 +264,8 @@ class InvoiceController extends Controller
                 'total_tax_amount' => $totals['total_tax_amount'],
                 'round_off' => $totals['round_off'],
                 'grand_total' => $totals['grand_total'],
+                'notes' => $validated['notes'] ?? null,
+                'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
                 'source' => 'manual',
             ]);
 
@@ -215,6 +279,7 @@ class InvoiceController extends Controller
                     'quantity' => $calcItem['quantity'],
                     'unit' => $calcItem['unit'] ?? 'NOS',
                     'unit_price' => $calcItem['unit_price'],
+                    'discount_amount' => $calcItem['discount_amount'] ?? 0,
                     'taxable_value' => $calcItem['taxable_value'],
                     'cgst_rate' => $calcItem['cgst_rate'],
                     'cgst_amount' => $calcItem['cgst_amount'],

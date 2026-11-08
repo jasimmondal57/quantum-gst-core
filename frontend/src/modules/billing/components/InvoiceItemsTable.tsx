@@ -58,13 +58,13 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
         : (match.selling_price ?? (typeof match.sale_price === "string" ? parseFloat(match.sale_price) : 0));
       const gst = typeof match.gst_rate === "number"
         ? match.gst_rate
-        : (typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18));
+        : (typeof match.gst_rate === "string" && !isNaN(parseFloat(match.gst_rate)) ? parseFloat(match.gst_rate) : 0);
 
       onAddItem({
         product_id: match.id,
         item_name: match.name,
         sku: match.sku || "",
-        hsn_sac: match.hsn_code || match.hsn_sac || "9983",
+        hsn_sac: match.hsn_code || match.hsn_sac || "",
         unit: match.unit || "NOS",
         unit_price: rate,
         gst_rate: gst,
@@ -117,13 +117,15 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
         const rate = typeof match.selling_price === "string"
           ? parseFloat(match.selling_price)
           : (match.selling_price ?? (typeof match.sale_price === "string" ? parseFloat(match.sale_price) : 0));
-        const gst = typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18);
+        const gst = typeof match.gst_rate === "number"
+          ? match.gst_rate
+          : (typeof match.gst_rate === "string" && !isNaN(parseFloat(match.gst_rate)) ? parseFloat(match.gst_rate) : 0);
 
         onAddItem({
           product_id: match.id,
           item_name: match.name,
           sku: match.sku || "",
-          hsn_sac: match.hsn_code || match.hsn_sac || "9983",
+          hsn_sac: match.hsn_code || match.hsn_sac || "",
           unit: match.unit || "NOS",
           quantity: selectedQuantities[id] || 1,
           unit_price: rate,
@@ -288,7 +290,7 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
           type="button"
           variant="soft"
           size="sm"
-          onClick={() => onAddItem({ item_type: "service", unit: "HRS", hsn_sac: "9983" })}
+          onClick={() => onAddItem({ item_type: "service", unit: "HRS", hsn_sac: "" })}
           icon={<PackagePlus className="w-3.5 h-3.5" />}
         >
           + Add Service Line
@@ -351,7 +353,9 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
                 const price = typeof prod.selling_price === "string"
                   ? parseFloat(prod.selling_price)
                   : (prod.selling_price ?? (typeof prod.sale_price === "string" ? parseFloat(prod.sale_price) : 0));
-                const gst = typeof prod.gst_rate === "string" ? parseFloat(prod.gst_rate) : (prod.gst_rate ?? 18);
+                const gst = typeof prod.gst_rate === "number"
+                  ? prod.gst_rate
+                  : (typeof prod.gst_rate === "string" && !isNaN(parseFloat(prod.gst_rate)) ? parseFloat(prod.gst_rate) : null);
 
                 return (
                   <div
@@ -378,11 +382,17 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
                             </span>
                           )}
                           <Badge variant="outline" size="sm">
-                            HSN: {prod.hsn_code || prod.hsn_sac || "9983"}
+                            HSN: {prod.hsn_code || prod.hsn_sac || "Unspecified"}
                           </Badge>
-                          <Badge variant="emerald" size="sm">
-                            GST: {gst}%
-                          </Badge>
+                          {gst !== null ? (
+                            <Badge variant="emerald" size="sm">
+                              GST: {gst}%
+                            </Badge>
+                          ) : (
+                            <Badge variant="warning" size="sm">
+                              GST: Not Set
+                            </Badge>
+                          )}
                           {prod.tax_inclusive && (
                             <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">
                               Tax-Inclusive

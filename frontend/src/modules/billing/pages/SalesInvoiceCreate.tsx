@@ -156,6 +156,12 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
       return;
     }
 
+    const missingHsn = totals.calculatedItems.some((item) => !item.hsn_sac || !item.hsn_sac.trim());
+    if (missingHsn) {
+      alert("Statutory Compliance Warning: Every invoice line item must have a valid statutory HSN / SAC code before saving.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const payload = {
@@ -172,7 +178,7 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
         items: totals.calculatedItems.map((item) => ({
           product_id: item.product_id,
           item_name: item.item_name,
-          hsn_sac: item.hsn_sac || "9983",
+          hsn_sac: item.hsn_sac.trim(),
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,

@@ -114,13 +114,15 @@ export const ItemSearch: React.FC<ItemSearchProps> = ({
       ? parseFloat(p.selling_price)
       : (p.selling_price ?? (typeof p.sale_price === "string" ? parseFloat(p.sale_price) : 0));
 
-    const gst = typeof p.gst_rate === "string" ? parseFloat(p.gst_rate) : (p.gst_rate ?? 18);
+    const gst = typeof p.gst_rate === "number"
+      ? p.gst_rate
+      : (typeof p.gst_rate === "string" && !isNaN(parseFloat(p.gst_rate)) ? parseFloat(p.gst_rate) : 0);
 
     onSelectProduct({
       product_id: p.id,
       item_name: p.name,
       sku: p.sku || "",
-      hsn_sac: p.hsn_code || p.hsn_sac || "9983",
+      hsn_sac: p.hsn_code || p.hsn_sac || "",
       unit: p.unit || "NOS",
       unit_price: rate,
       gst_rate: gst,
@@ -232,7 +234,7 @@ export const ItemSearch: React.FC<ItemSearchProps> = ({
                           )}
                         </div>
                         <div className="text-[11px] text-[#71817a] mt-0.5">
-                          HSN: {prod.hsn_code || prod.hsn_sac || "9983"} · GST: {prod.gst_rate ?? 18}%
+                          HSN: {prod.hsn_code || prod.hsn_sac || "Unspecified"} · GST: {prod.gst_rate !== undefined && prod.gst_rate !== null ? `${prod.gst_rate}%` : "Not Set"}
                         </div>
                       </div>
                       <div className="text-right shrink-0">

@@ -187,14 +187,84 @@ class GSTCalculationEngine
         $totalRate = bcadd($taxPct, $cessPct, 4);
         $multiplier = bcadd('100', $totalRate, 4);
 
-        return bcdiv(bcmul($grossLessSpecific, '100', 6), $multiplier, 2);
+        $rawTaxable = bcdiv(bcmul($grossLessSpecific, '100', 6), $multiplier, 4);
+        return $this->bcround2($rawTaxable);
+    }
+
+    /**
+     * Half-up rounding to 2 decimal places using exact BCMath string arithmetic.
+     */
+    public function bcround2(string $number): string
+    {
+        $factor = '0.005';
+        if (str_starts_with($number, '-')) {
+            $abs = substr($number, 1);
+            return '-' . bcdiv(bcadd($abs, $factor, 4), '1', 2);
+        }
+        return bcdiv(bcadd($number, $factor, 4), '1', 2);
+    }
+
+    /**
+     * Apportion invoice-level discount across items proportionally based on their pre-discount base taxable value.
+     * Complies with Section 15(3) of CGST Act.
+     *
+     * @param array $items Array of items, each with 'taxable_value' or ('quantity' * 'unit_price' - 'line_discount')
+     * @param string $discountType 'percentage' | 'fixed'
+     * @param string $discountValue Discount percentage or fixed amount
+     * @return array Array of allocated discount amounts per item indexed by item key
+     */
+    public function allocateInvoiceDiscount(array $items, string $discountType = 'fixed', string $discountValue = '0'): array
+    {
+        $totalBaseTaxable = '0.00';
+        foreach ($items as $item) {
+            $taxable = (string) ($item['taxable_value'] ?? '0.00');
+            $totalBaseTaxable = bcadd($totalBaseTaxable, $taxable, 4);
+        }
+
+        if (bccomp($totalBaseTaxable, '0', 4) <= 0) {
+            return array_fill(0, count($items), '0.00');
+        }
+
+        $totalDiscountToAllocate = '0.00';
+        if ($discountType === 'percentage') {
+            $pct = bcdiv($discountValue, '1', 4);
+            $totalDiscountToAllocate = bcdiv(bcmul($totalBaseTaxable, $pct, 4), '100', 2);
+        } else {
+            $totalDiscountToAllocate = bcdiv($discountValue, '1', 2);
+        }
+
+        if (bccomp($totalDiscountToAllocate, $totalBaseTaxable, 4) > 0) {
+            $totalDiscountToAllocate = bcdiv($totalBaseTaxable, '1', 2);
+        }
+
+        $allocated = [];
+        $runningSum = '0.00';
+        $keys = array_keys($items);
+        $lastIndex = count($keys) - 1;
+
+        foreach ($keys as $idx => $key) {
+            if ($idx === $lastIndex) {
+                // Last item absorbs any fraction-of-a-paisa rounding residual
+                $lineDiscount = bcsub($totalDiscountToAllocate, $runningSum, 2);
+            } else {
+                $itemTaxable = (string) ($items[$key]['taxable_value'] ?? '0.00');
+                $ratio = bcdiv($itemTaxable, $totalBaseTaxable, 6);
+                $lineDiscount = bcdiv(bcmul($totalDiscountToAllocate, $ratio, 4), '1', 2);
+                $runningSum = bcadd($runningSum, $lineDiscount, 2);
+            }
+            $allocated[$key] = $lineDiscount;
+        }
+
+        return $allocated;
     }
 
     /**
      * Calculate financial totals for an entire document (e.g., Invoice / Bill / Note).
      * Guaranteed exact decimal output matching database schema.
+     * When $isReverseCharge is true (Sec 9(3)/9(4)), tax amounts are retained for statutory reporting,
+     * but customer payable grand_total strictly excludes reverse charge taxes.
      */
-    public function calculateDocumentTotals(array $calculatedItems): array
+    public function calculateDocumentTotals(array $calculatedItems, bool $isReverseCharge = false): array
     {
         $totalTaxable = '0.00';
         $totalCgst = '0.00';
@@ -215,8 +285,8 @@ class GSTCalculationEngine
             $totalTax = bcadd($totalTax, (string) ($item['total_tax'] ?? '0.00'), 2);
         }
 
-        // Subtotal is strictly the sum of taxable base and taxes
-        $subTotal = bcadd($totalTaxable, $totalTax, 2);
+        // Subtotal payable: under Reverse Charge, recipient pays tax directly to govt, so grand_total = taxable
+        $subTotal = $isReverseCharge ? $totalTaxable : bcadd($totalTaxable, $totalTax, 2);
 
         // Standard Indian statutory invoice rounding to nearest whole rupee using exact BCMath
         $grandTotal = $this->bcroundRupee($subTotal);

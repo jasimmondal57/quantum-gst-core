@@ -162,7 +162,7 @@ export const PurchaseBillCreate: React.FC<PurchaseBillCreateProps> = ({
         items: totals.calculatedItems.map((item) => ({
           product_id: item.product_id,
           item_name: item.item_name,
-          hsn_sac: item.hsn_sac || "9983",
+          hsn_sac: (item.hsn_sac || "").trim(),
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
