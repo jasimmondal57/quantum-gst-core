@@ -23,6 +23,7 @@ export interface BusinessProfile {
     address_line1?: string;
     city?: string;
     pincode?: string;
+    is_primary?: boolean;
   }>;
 }
 
@@ -431,7 +432,7 @@ class QuantumApiClient {
     transport_mode?: string;
     transporter_name?: string;
   }) {
-    const res = await fetch(`${API_BASE}/eway/generate-invoice`, {
+    const res = await fetch(`${API_BASE}/eway/generate`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data)
@@ -605,6 +606,99 @@ class QuantumApiClient {
     return json;
   }
 
+  async fetchGodowns(businessId: string) {
+    const res = await fetch(`${API_BASE}/manufacturing/godowns?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async createGodown(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/manufacturing/godowns`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Failed to create godown");
+    return json;
+  }
+
+  async fetchGodownStock(godownId: string) {
+    const res = await fetch(`${API_BASE}/manufacturing/godowns/${godownId}/stock`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return { godown: null, inventory: [] };
+    return res.json();
+  }
+
+  async fetchStockTransfers(businessId: string) {
+    const res = await fetch(`${API_BASE}/manufacturing/stock-transfers?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return { data: [] };
+    return res.json();
+  }
+
+  async createStockTransfer(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/manufacturing/stock-transfers`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Failed to execute stock transfer");
+    return json;
+  }
+
+  async fetchBalanceSheet(businessId: string, asOfDate?: string) {
+    const query = asOfDate ? `&as_of_date=${asOfDate}` : "";
+    const res = await fetch(`${API_BASE}/accounting/balance-sheet?business_id=${businessId}${query}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  async createAccount(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/accounting/accounts`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Failed to create account");
+    return json;
+  }
+
+  async postJournalEntry(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/accounting/journal-entries`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Failed to post journal entry");
+    return json;
+  }
+
+  async fetchEInvoiceJson(invoiceId: string) {
+    const res = await fetch(`${API_BASE}/einvoice/${invoiceId}/json`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) throw new Error("Failed to fetch e-Invoice JSON schema");
+    return res.json();
+  }
+
+  async fetchMarketplaceReconciliation(businessId: string) {
+    const res = await fetch(`${API_BASE}/marketplace/reconciliation?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return { channels: [], total_orders: 0 };
+    return res.json();
+  }
+
   // Convenience aliases
   getInvoices = (bizId?: string) => this.fetchInvoices(bizId);
   getCustomers = (bizId?: string) => this.fetchCustomers(bizId);
@@ -617,6 +711,9 @@ class QuantumApiClient {
   getJournalEntries = (bizId: string) => this.fetchJournalEntries(bizId);
   getTrialBalance = (bizId: string) => this.fetchTrialBalance(bizId);
   getProfitLoss = (bizId: string) => this.fetchProfitLoss(bizId);
+  getBalanceSheet = (bizId: string, asOfDate?: string) => this.fetchBalanceSheet(bizId, asOfDate);
+  getGodowns = (bizId: string) => this.fetchGodowns(bizId);
+  getStockTransfers = (bizId: string) => this.fetchStockTransfers(bizId);
 
   getTallyXmlExportUrl(businessId: string, type: "all" | "masters" | "vouchers" = "all"): string {
     const activeToken = this.getToken();

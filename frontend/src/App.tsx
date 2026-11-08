@@ -376,6 +376,7 @@ export function App() {
           business={activeBusiness}
           products={products}
           onRefresh={() => refreshCloudData()}
+          onNavigate={(screen) => navigateTo(screen)}
         />
       )}
 
@@ -389,6 +390,7 @@ export function App() {
         <GstComplianceScreen
           business={activeBusiness}
           invoices={invoices}
+          onRefresh={() => refreshCloudData()}
         />
       )}
 
