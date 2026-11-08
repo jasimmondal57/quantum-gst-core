@@ -3,9 +3,10 @@ import QRCode from "qrcode";
 export interface DynamicUpiParams {
   payeeVpa: string;        // e.g. "quantumgst@okhdfcbank"
   payeeName: string;       // e.g. "QuantumGST Solutions"
-  amount: number;          // e.g. 3255.00
+  amount: number | string; // e.g. 3255.00 or "3255.00"
   transactionNote?: string;// e.g. "INV-QGST-0042"
   transactionRef?: string; // e.g. "INV0042"
+  gstin?: string;
 }
 
 /**
@@ -16,7 +17,8 @@ export function buildUpiUri(params: DynamicUpiParams): string {
   const { payeeVpa, payeeName, amount, transactionNote, transactionRef } = params;
   const vpa = encodeURIComponent(payeeVpa.trim());
   const name = encodeURIComponent(payeeName.trim());
-  const amt = amount > 0 ? amount.toFixed(2) : "0.00";
+  const numAmt = typeof amount === "number" ? amount : parseFloat(amount) || 0;
+  const amt = numAmt > 0 ? numAmt.toFixed(2) : "0.00";
   const note = encodeURIComponent(transactionNote || "Invoice Settlement");
 
   let uri = `upi://pay?pa=${vpa}&pn=${name}&am=${amt}&cu=INR&tn=${note}`;
@@ -67,3 +69,6 @@ export async function generateUpiQrDataUrl(params: DynamicUpiParams): Promise<st
     return "";
   }
 }
+
+export const generateUpiQrCode = generateUpiQrDataUrl;
+

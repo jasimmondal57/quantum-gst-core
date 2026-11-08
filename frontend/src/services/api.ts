@@ -40,6 +40,19 @@ export interface Customer {
   billing_pincode?: string;
 }
 
+export interface Product {
+  id: string;
+  business_id: string;
+  type: string;
+  sku?: string;
+  name: string;
+  hsn_sac: string;
+  unit?: string;
+  sale_price: string;
+  purchase_price?: string;
+  tax_inclusive?: boolean;
+}
+
 export interface InvoiceItem {
   id?: string;
   item_name: string;
@@ -430,6 +443,136 @@ class QuantumApiClient {
     }
     return json;
   }
+
+  async fetchProducts(businessId?: string): Promise<Product[]> {
+    const url = businessId ? `${API_BASE}/products?business_id=${businessId}` : `${API_BASE}/products`;
+    const res = await fetch(url, { headers: this.getHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async createProduct(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/products`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to create product");
+    }
+    return json;
+  }
+
+  async createGstin(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/gstins`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to register GSTIN");
+    }
+    return json;
+  }
+
+  async fetchGstr3b(businessId: string) {
+    const res = await fetch(`${API_BASE}/reports/gstr3b?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return {};
+    return res.json();
+  }
+
+  async fetchAccounts(businessId: string) {
+    const res = await fetch(`${API_BASE}/accounting/accounts?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async fetchJournalEntries(businessId: string) {
+    const res = await fetch(`${API_BASE}/accounting/journal-entries?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return { data: [] };
+    return res.json();
+  }
+
+  async fetchTrialBalance(businessId: string) {
+    const res = await fetch(`${API_BASE}/accounting/trial-balance?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  async fetchProfitLoss(businessId: string) {
+    const res = await fetch(`${API_BASE}/accounting/profit-loss?business_id=${businessId}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  async cancelInvoice(invoiceId: string, reason: string = "Cancelled by user") {
+    const res = await fetch(`${API_BASE}/invoices/${invoiceId}/cancel`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to cancel invoice");
+    }
+    return json;
+  }
+
+  async downloadInvoicePdf(invoiceId: string, invoiceNumber: string) {
+    const res = await fetch(`${API_BASE}/invoices/${invoiceId}/pdf`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      throw new Error("Failed to download PDF");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Invoice_${invoiceNumber}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async importMarketplace(data: Record<string, unknown>) {
+    const res = await fetch(`${API_BASE}/marketplace/import`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Marketplace report import failed");
+    }
+    return json;
+  }
+
+  // Convenience aliases
+  getInvoices = (bizId?: string) => this.fetchInvoices(bizId);
+  getCustomers = (bizId?: string) => this.fetchCustomers(bizId);
+  getPurchases = (bizId: string) => this.fetchPurchases(bizId);
+  getProducts = (bizId?: string) => this.fetchProducts(bizId);
+  getEWayBills = (bizId: string) => this.fetchEWayBills(bizId);
+  getGstr1 = (bizId?: string) => this.fetchGstr1Summary(bizId);
+  getGstr3b = (bizId: string) => this.fetchGstr3b(bizId);
+  getAccounts = (bizId: string) => this.fetchAccounts(bizId);
+  getJournalEntries = (bizId: string) => this.fetchJournalEntries(bizId);
+  getTrialBalance = (bizId: string) => this.fetchTrialBalance(bizId);
+  getProfitLoss = (bizId: string) => this.fetchProfitLoss(bizId);
 
   getTallyXmlExportUrl(businessId: string, type: "all" | "masters" | "vouchers" = "all"): string {
     const activeToken = this.getToken();
