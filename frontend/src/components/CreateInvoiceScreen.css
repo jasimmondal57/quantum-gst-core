@@ -1,0 +1,32 @@
+/* Quantum GST — invoice entry workspace. Scoped to CreateInvoiceScreen. */
+.qgst-invoice-entry{--qgst-primary:#167a55;--qgst-primary-dark:#105b40;--qgst-soft:#eaf6ef;--qgst-ink:#172b25;--qgst-muted:#71817a;--qgst-line:#e2ebe5;--qgst-canvas:#f5f8f6;--qgst-radius:14px;color:var(--qgst-ink);width:100%;max-width:1600px;margin:0 auto;gap:18px!important}
+.qgst-invoice-entry>div{min-width:0}
+.qgst-invoice-entry>div[style*="background: #ffffff"]{background:#fff!important;border:1px solid var(--qgst-line)!important;border-radius:var(--qgst-radius)!important;box-shadow:0 4px 18px rgba(24,64,43,.045)!important}
+.qgst-invoice-entry h1{font-size:clamp(20px,2vw,26px)!important;letter-spacing:-.55px;color:#18372a!important}
+.qgst-invoice-entry h3{color:#244333!important}
+.qgst-invoice-entry label{font-size:12px!important;font-weight:650!important;color:#52675b!important;margin-bottom:6px!important;display:block}
+.qgst-invoice-entry input:not([type=checkbox]),.qgst-invoice-entry select,.qgst-invoice-entry textarea{min-height:40px!important;border:1px solid #d8e4dc!important;border-radius:8px!important;background:#fff!important;color:#243b2e!important;padding:9px 11px!important;font:500 13px/1.4 Inter,system-ui,sans-serif!important;box-shadow:none!important;outline:none;transition:border-color .15s,box-shadow .15s}
+.qgst-invoice-entry textarea{min-height:76px!important}
+.qgst-invoice-entry input:focus,.qgst-invoice-entry select:focus,.qgst-invoice-entry textarea:focus{border-color:#26966a!important;box-shadow:0 0 0 3px rgba(38,150,106,.12)!important}
+.qgst-invoice-entry input::placeholder,.qgst-invoice-entry textarea::placeholder{color:#a0ada5}
+.qgst-invoice-entry button{transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}
+.qgst-invoice-entry button:focus-visible{outline:3px solid rgba(38,150,106,.25);outline-offset:2px}
+.qgst-invoice-entry button:hover{filter:brightness(.985)}
+.qgst-invoice-entry table{min-width:940px;border-collapse:separate!important;border-spacing:0!important}
+.qgst-invoice-entry th{background:#f3f8f4!important;color:#62766a!important;font-size:10px!important;letter-spacing:.045em;padding:12px 10px!important;border-bottom:1px solid #dfe9e2!important}
+.qgst-invoice-entry td{padding:10px!important;border-bottom:1px solid #edf2ee!important;vertical-align:middle}
+.qgst-invoice-entry td input,.qgst-invoice-entry td select{min-width:64px}
+.qgst-invoice-entry [style*="overflowX: auto"],.qgst-invoice-entry [style*="overflow-x: auto"]{border:1px solid #e4ece6;border-radius:10px}
+.qgst-invoice-entry [style*="linear-gradient(135deg"]{background:linear-gradient(135deg,#167a55,#23986b)!important}
+.qgst-invoice-entry [style*="#1677e8"],.qgst-invoice-entry [style*="#1d4ed8"]{color:var(--qgst-primary)!important}
+.qgst-invoice-entry [style*="background: #eff6ff"],.qgst-invoice-entry [style*="background:#eff6ff"]{background:var(--qgst-soft)!important}
+.qgst-invoice-entry [style*="border: 2px solid #1677e8"]{border:1px solid #7bc49d!important}
+.qgst-invoice-entry [style*="color: #1677e8"],.qgst-invoice-entry [style*="color: #1d4ed8"]{color:var(--qgst-primary)!important}
+.qgst-invoice-entry [style*="gridTemplateColumns"]{min-width:0}
+.qgst-invoice-entry .qgst-entry-help{color:var(--qgst-muted);font-size:12px}
+.qgst-invoice-entry .qgst-entry-toolbar{position:sticky;bottom:12px;z-index:20;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--qgst-line);border-radius:12px;padding:12px 14px;box-shadow:0 8px 28px rgba(25,55,38,.1)}
+.qgst-invoice-entry ::-webkit-scrollbar{height:8px;width:8px}
+.qgst-invoice-entry ::-webkit-scrollbar-thumb{background:#cbd9cf;border-radius:8px}
+@media(max-width:900px){.qgst-invoice-entry>div[style*="gridTemplateColumns: 1.2fr 0.8fr"],.qgst-invoice-entry>div[style*="gridTemplateColumns: 1.2fr 0.8fr"]>div{grid-template-columns:1fr!important}.qgst-invoice-entry>div[style*="gridTemplateColumns: 1.2fr 0.8fr"]{display:grid!important;grid-template-columns:1fr!important}}
+@media(max-width:640px){.qgst-invoice-entry{gap:12px!important}.qgst-invoice-entry>div[style*="padding: 20px 24px"],.qgst-invoice-entry>div[style*="padding: 20px"]{padding:14px!important}.qgst-invoice-entry input:not([type=checkbox]),.qgst-invoice-entry select{min-height:42px!important}.qgst-invoice-entry table{min-width:860px}.qgst-invoice-entry h1{font-size:20px!important}}
+@media print{.qgst-invoice-entry{max-width:none}.qgst-invoice-entry>div{box-shadow:none!important}}
