@@ -1,25 +1,25 @@
 :root {
   /* Quantum GST Design System Tokens */
   --q-primary: #167a55;
-  --q-primary-hover: #126345;
-  --q-primary-dark: #0d4a34;
-  --q-primary-soft: #e8f5ee;
+  --q-primary-hover: #136949;
+  --q-primary-dark: #105b40;
+  --q-primary-soft: #eaf6ef;
   --q-primary-border: #b8e2cd;
-  --q-primary-text: #0b5539;
+  --q-primary-text: #172b25;
 
-  --q-bg-app: #f7f9fc;
+  --q-bg-app: #f5f8f6;
   --q-bg-surface: #ffffff;
-  --q-bg-subtle: #f1f5f9;
-  --q-bg-hover: #f8fafc;
+  --q-bg-subtle: #edf3f0;
+  --q-bg-hover: #f1f7f4;
 
-  --q-border-light: #e2e8f0;
-  --q-border-subtle: #edf2f7;
+  --q-border-light: #e2ebe5;
+  --q-border-subtle: #ebf2ee;
   --q-border-focus: #167a55;
 
-  --q-text-title: #0f172a;
-  --q-text-body: #334155;
-  --q-text-muted: #64748b;
-  --q-text-dim: #94a3b8;
+  --q-text-title: #172b25;
+  --q-text-body: #2d3f39;
+  --q-text-muted: #71817a;
+  --q-text-dim: #9aa7a2;
 
   --q-success: #10b981;
   --q-success-soft: #ecfdf5;
@@ -38,11 +38,12 @@
   --q-info-text: #1e40af;
 
   --q-radius-sm: 6px;
-  --q-radius-md: 10px;
-  --q-radius-lg: 14px;
+  --q-radius-md: 8px;
+  --q-radius-lg: 12px;
+  --q-radius-xl: 14px;
   --q-radius-full: 9999px;
 
-  --q-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --q-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --q-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --q-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --q-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --q-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
 }

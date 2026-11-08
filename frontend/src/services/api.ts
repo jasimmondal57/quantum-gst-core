@@ -12,6 +12,7 @@ export interface BusinessProfile {
   pan?: string;
   email?: string;
   phone?: string;
+  address?: string;
   currency?: string;
   status?: string;
   gstins?: Array<{
@@ -33,24 +34,33 @@ export interface Customer {
   customer_type?: string;
   gstin?: string;
   state_code: string;
-  state_name: string;
+  state_name?: string;
+  state?: string;
   email?: string;
   phone?: string;
   billing_address?: string;
+  address?: string;
   billing_pincode?: string;
+  pincode?: string;
+  city?: string;
 }
 
 export interface Product {
   id: string;
   business_id: string;
-  type: string;
+  type?: string;
   sku?: string;
+  barcode?: string;
   name: string;
-  hsn_sac: string;
+  hsn_sac?: string;
+  hsn_code?: string;
   unit?: string;
-  sale_price: string;
+  sale_price?: string;
+  selling_price?: string | number;
   purchase_price?: string;
   tax_inclusive?: boolean;
+  gst_rate?: number | string;
+  current_stock?: number | string;
 }
 
 export interface InvoiceItem {
@@ -180,6 +190,36 @@ class QuantumApiClient {
     const json = await res.json();
     if (json.token) {
       this.setToken(json.token);
+    }
+    return json;
+  }
+
+  async post(endpoint: string, body?: unknown) {
+    const url = endpoint.startsWith("http")
+      ? endpoint
+      : `${API_BASE}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((json as { message?: string }).message || "Request failed");
+    }
+    return json;
+  }
+
+  async get(endpoint: string) {
+    const url = endpoint.startsWith("http")
+      ? endpoint
+      : `${API_BASE}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`;
+    const res = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((json as { message?: string }).message || "Request failed");
     }
     return json;
   }

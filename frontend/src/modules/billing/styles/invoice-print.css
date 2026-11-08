@@ -1,0 +1,66 @@
+/* Quantum GST Statutory Print & PDF Stylesheet */
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+  }
+
+  /* Hide navigation, topbar, sidebars, and screen-only elements */
+  .no-print,
+  nav,
+  header,
+  aside,
+  .billing-action-bar,
+  button,
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* A4 Portrait Template */
+  .a4-print-container {
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 12mm 15mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Thermal 80mm Template */
+  .thermal-80-container {
+    width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
+    font-family: 'Courier New', Courier, monospace !important;
+  }
+
+  /* Table styling */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 4px 6px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid !important;
+  }
+
+  .page-break-before {
+    page-break-before: always !important;
+  }
+}

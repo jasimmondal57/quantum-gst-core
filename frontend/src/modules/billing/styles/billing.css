@@ -1,0 +1,62 @@
+/* Quantum GST Billing Workspace Styles */
+.billing-workspace {
+  background-color: var(--q-bg-app);
+  min-height: 100vh;
+}
+
+.billing-card {
+  background-color: var(--q-bg-surface);
+  border: 1px solid var(--q-border-light);
+  border-radius: var(--q-radius-lg);
+  box-shadow: var(--q-shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.billing-card:hover {
+  border-color: #cbdad1;
+}
+
+.billing-table-header {
+  background-color: #f0f6f3;
+  color: #172b25;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.billing-input {
+  border: 1px solid var(--q-border-light);
+  border-radius: var(--q-radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--q-text-title);
+  background-color: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.billing-input:focus {
+  outline: none;
+  border-color: var(--q-primary);
+  box-shadow: 0 0 0 3px rgba(22, 122, 85, 0.15);
+}
+
+.shortcut-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #167a55;
+  background-color: #eaf6ef;
+  border: 1px solid #b8e2cd;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  line-height: 1;
+}
+
+.sticky-summary {
+  position: sticky;
+  top: 1.5rem;
+}

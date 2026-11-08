@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { AuthScreen } from "./components/AuthScreen";
-import { CreateInvoiceScreen } from "./components/CreateInvoiceScreen";
 import { AppLayout } from "./components/layout/AppLayout";
 import { DashboardScreen } from "./modules/dashboard/DashboardScreen";
 import { PosBillingScreen } from "./modules/billing/PosBillingScreen";
-import { SalesListScreen } from "./modules/sales/SalesListScreen";
+import { SalesInvoiceCreate } from "./modules/billing/pages/SalesInvoiceCreate";
+import { QuotationCreate } from "./modules/billing/pages/QuotationCreate";
+import { CreditNoteCreate } from "./modules/billing/pages/CreditNoteCreate";
+import { DeliveryChallanCreate } from "./modules/billing/pages/DeliveryChallanCreate";
+import { InvoiceList } from "./modules/billing/pages/InvoiceList";
 import { PurchasesListScreen } from "./modules/purchases/PurchasesListScreen";
 import { InventoryScreen } from "./modules/inventory/InventoryScreen";
 import { AccountingScreen } from "./modules/accounting/AccountingScreen";
@@ -31,6 +34,9 @@ export type ScreenId =
   | "dashboard"
   | "billing_pos"
   | "billing"
+  | "quotations"
+  | "credit_notes"
+  | "delivery_challans"
   | "sales"
   | "purchases"
   | "inventory"
@@ -47,6 +53,12 @@ export const ROUTE_MAP: Record<string, ScreenId> = {
   "/billing": "billing",
   "/pos": "billing_pos",
   "/invoices/create": "billing",
+  "/quotations": "quotations",
+  "/quotations/create": "quotations",
+  "/credit-notes": "credit_notes",
+  "/credit-notes/create": "credit_notes",
+  "/delivery-challans": "delivery_challans",
+  "/delivery-challans/create": "delivery_challans",
   "/sales": "sales",
   "/sales/invoices": "sales",
   "/purchases": "purchases",
@@ -66,6 +78,9 @@ export const SCREEN_TO_SLUG: Record<ScreenId, string> = {
   dashboard: "/dashboard",
   billing_pos: "/pos",
   billing: "/billing",
+  quotations: "/quotations",
+  credit_notes: "/credit-notes",
+  delivery_challans: "/delivery-challans",
   sales: "/sales",
   purchases: "/purchases",
   inventory: "/inventory",
@@ -234,12 +249,6 @@ export function App() {
     );
   }
 
-  // Active GSTIN info for CreateInvoiceScreen
-  const primaryGstinObj = activeBusiness?.gstins?.[0];
-  const primaryGstin = primaryGstinObj?.gstin || "27AAACB9999F1Z9";
-  const stateCode = primaryGstinObj?.state_code || "27";
-  const stateName = primaryGstinObj?.state_name || "Maharashtra";
-
   return (
     <AppLayout
       activeScreen={activeScreen}
@@ -280,49 +289,65 @@ export function App() {
         />
       )}
 
-      {/* 3. Comprehensive Tax Invoice Billing Engine */}
+      {/* 3. Sales Invoice Workspace (Modular Redesign) */}
       {activeScreen === "billing" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-2">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Enterprise GST Billing & Invoicing Engine
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Issue statutory tax invoices, quotations, proforma, delivery challans, and credit/debit notes.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateTo("sales")}
-            >
-              Back to Invoices
-            </Button>
-          </div>
-          <CreateInvoiceScreen
-            primaryGstin={primaryGstin}
-            stateCode={stateCode}
-            stateName={stateName}
-            legalName={activeBusiness?.legal_name || "Primary Company"}
-            tradeName={activeBusiness?.trade_name || "Primary Brand"}
-            addressLine={primaryGstinObj?.address_line1 || ""}
-            city={primaryGstinObj?.city || ""}
-            pincode={primaryGstinObj?.pincode || ""}
-            activeBusinessId={activeBusiness?.id || null}
-            activeOrgId={activeBusiness?.organization_id || null}
-            activeGstinId={primaryGstinObj?.id || null}
-            onInvoiceCreated={() => {
-              refreshCloudData();
-              navigateTo("sales");
-            }}
-          />
-        </div>
+        <SalesInvoiceCreate
+          business={activeBusiness}
+          customers={customers}
+          products={products}
+          onInvoiceCreated={() => {
+            refreshCloudData();
+            navigateTo("sales");
+          }}
+          onNavigate={(route) => {
+            const screen = getScreenFromPathname(route);
+            navigateTo(screen);
+          }}
+        />
+      )}
+
+      {/* 3a. Quotations & Estimates */}
+      {activeScreen === "quotations" && (
+        <QuotationCreate
+          business={activeBusiness}
+          customers={customers}
+          products={products}
+          onNavigate={(route) => {
+            const screen = getScreenFromPathname(route);
+            navigateTo(screen);
+          }}
+        />
+      )}
+
+      {/* 3b. Credit Notes (Sales Return) */}
+      {activeScreen === "credit_notes" && (
+        <CreditNoteCreate
+          business={activeBusiness}
+          customers={customers}
+          products={products}
+          onNavigate={(route) => {
+            const screen = getScreenFromPathname(route);
+            navigateTo(screen);
+          }}
+        />
+      )}
+
+      {/* 3c. Delivery Challans (Rule 55) */}
+      {activeScreen === "delivery_challans" && (
+        <DeliveryChallanCreate
+          business={activeBusiness}
+          customers={customers}
+          products={products}
+          onNavigate={(route) => {
+            const screen = getScreenFromPathname(route);
+            navigateTo(screen);
+          }}
+        />
       )}
 
       {/* 4. Sales & Invoices List */}
       {activeScreen === "sales" && (
-        <SalesListScreen
+        <InvoiceList
           business={activeBusiness}
           invoices={invoices}
           onRefresh={() => refreshCloudData()}

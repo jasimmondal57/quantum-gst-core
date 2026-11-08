@@ -9,11 +9,17 @@ import {
   FileSpreadsheet,
   Users,
   Store,
-  Boxes,
   Settings,
+  ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Plus,
+  FileText,
+  FileCheck,
+  RotateCcw,
+  Truck,
 } from "lucide-react";
+import { Badge } from "../ui/Badge";
 import type { BusinessProfile } from "../../services/api";
 
 export interface NavItem {
@@ -21,7 +27,6 @@ export interface NavItem {
   label: string;
   icon: React.ReactNode;
   badge?: string;
-  children?: { id: string; label: string }[];
 }
 
 export interface SidebarProps {
@@ -42,6 +47,12 @@ export const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
         icon: <LayoutDashboard className="w-4 h-4" />,
       },
       {
+        id: "billing",
+        label: "Create Invoice",
+        icon: <FileText className="w-4 h-4" />,
+        badge: "New",
+      },
+      {
         id: "billing_pos",
         label: "POS Billing",
         icon: <Receipt className="w-4 h-4" />,
@@ -60,11 +71,26 @@ export const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
     ],
   },
   {
-    category: "OPERATIONS",
+    category: "DOCUMENTS & OPERATIONS",
     items: [
       {
+        id: "quotations",
+        label: "Quotations",
+        icon: <FileCheck className="w-4 h-4" />,
+      },
+      {
+        id: "credit_notes",
+        label: "Credit Notes",
+        icon: <RotateCcw className="w-4 h-4" />,
+      },
+      {
+        id: "delivery_challans",
+        label: "Delivery Challans",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
         id: "inventory",
-        label: "Inventory & Warehouses",
+        label: "Inventory & Stock",
         icon: <Package className="w-4 h-4" />,
       },
       {
@@ -78,29 +104,29 @@ export const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
         icon: <FileSpreadsheet className="w-4 h-4" />,
         badge: "Gov",
       },
-      {
-        id: "contacts",
-        label: "Parties (CRM)",
-        icon: <Users className="w-4 h-4" />,
-      },
     ],
   },
   {
     category: "CHANNELS & ADMIN",
     items: [
       {
+        id: "contacts",
+        label: "Parties & Contacts",
+        icon: <Users className="w-4 h-4" />,
+      },
+      {
         id: "marketplace",
-        label: "Marketplace Reports",
-        icon: <Boxes className="w-4 h-4" />,
+        label: "Marketplace Feeds",
+        icon: <Store className="w-4 h-4" />,
       },
       {
         id: "shopify",
-        label: "Shopify Store",
+        label: "Shopify Sync",
         icon: <Store className="w-4 h-4" />,
       },
       {
         id: "settings",
-        label: "Settings & GSTINs",
+        label: "Business & GSTINs",
         icon: <Settings className="w-4 h-4" />,
       },
     ],
@@ -114,129 +140,142 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   onToggleCollapse,
 }) => {
+  const primaryGstin = activeBusiness?.gstins?.[0]?.gstin || "No GSTIN Registered";
+
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-30 flex flex-col bg-[#0f231c] text-slate-200 transition-all duration-300 border-r border-[#16382b] select-none ${
-        collapsed ? "w-18" : "w-64"
+      className={`relative bg-white border-r border-[#e2ebe5] flex flex-col transition-all duration-200 select-none ${
+        collapsed ? "w-16" : "w-64"
       }`}
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-[#16382b]">
-        <div
-          onClick={() => onNavigate("dashboard")}
-          className="flex items-center gap-3 cursor-pointer overflow-hidden"
-        >
-          <div className="w-9 h-9 rounded-xl bg-[#167a55] text-white flex items-center justify-center font-black text-base shadow-md shrink-0">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-[#e2ebe5]">
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-[#167a55] flex items-center justify-center text-white font-bold text-sm shadow-xs shrink-0">
+              Q
+            </div>
+            <div className="truncate">
+              <span className="font-extrabold text-sm tracking-tight text-[#172b25] block">
+                Quantum<span className="text-[#167a55]">GST</span>
+              </span>
+              <span className="text-[10px] text-[#71817a] font-medium block truncate">
+                Billing & Cloud ERP
+              </span>
+            </div>
+          </div>
+        )}
+
+        {collapsed && (
+          <div className="w-8 h-8 mx-auto rounded-lg bg-[#167a55] flex items-center justify-center text-white font-bold text-sm shadow-xs">
             Q
           </div>
-          {!collapsed && (
-            <div className="truncate">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-white text-sm tracking-tight">
-                  Quantum GST
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#167a55] text-emerald-100">
-                  PRO
-                </span>
-              </div>
-              <p className="text-[11px] text-emerald-300/70 truncate">
-                Financial OS for Bharat
-              </p>
-            </div>
-          )}
-        </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className={`p-1.5 rounded-lg text-[#71817a] hover:text-[#172b25] hover:bg-[#f5f8f6] transition-colors ${
+            collapsed ? "hidden" : "block"
+          }`}
+          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Active Business Mini Card */}
+      {/* Active Business Context Pill */}
       {!collapsed && (
-        <div className="mx-3 mt-3.5 mb-2 p-2.5 rounded-xl bg-[#16382b]/70 border border-[#1d4737] flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-white truncate">
-              {activeBusiness?.trade_name || activeBusiness?.legal_name || "Primary Company"}
-            </p>
-            <p className="text-[10px] text-emerald-300 font-mono tracking-wider truncate">
-              {activeBusiness?.gstins?.[0]?.gstin || "No Active GSTIN"}
-            </p>
+        <div className="p-3 mx-3 my-2 rounded-xl bg-[#eaf6ef] border border-[#b8e2cd]">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#172b25] truncate">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#167a55] shrink-0" />
+            <span className="truncate">
+              {activeBusiness?.trade_name || activeBusiness?.legal_name || "Primary Entity"}
+            </span>
           </div>
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <p className="text-[10px] font-mono text-[#167a55] mt-0.5 truncate pl-5">
+            {primaryGstin}
+          </p>
         </div>
       )}
 
-      {/* Navigation Groups */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 no-scrollbar">
+      {/* Quick Action Button */}
+      <div className="p-3">
+        <button
+          type="button"
+          onClick={() => onNavigate("billing")}
+          className={`w-full flex items-center justify-center gap-2 bg-[#167a55] hover:bg-[#136949] text-white font-semibold text-xs py-2 rounded-xl shadow-xs transition-colors ${
+            collapsed ? "px-0" : "px-3"
+          }`}
+          title="Create Tax Invoice (F3)"
+        >
+          <Plus className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>+ Create Invoice</span>}
+        </button>
+      </div>
+
+      {/* Navigation Links */}
+      <div className="flex-1 overflow-y-auto px-2 py-1 space-y-4 scrollbar-thin">
         {NAV_ITEMS.map((group) => (
-          <div key={group.category} className="space-y-1">
+          <div key={group.category} className="space-y-0.5">
             {!collapsed && (
-              <p className="px-2.5 text-[10px] font-semibold text-emerald-300/50 tracking-wider">
+              <h4 className="px-3 text-[10px] font-bold text-[#71817a] uppercase tracking-wider mb-1">
                 {group.category}
-              </p>
+              </h4>
             )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const isActive = activeScreen === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onNavigate(item.id)}
-                    title={collapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
-                      isActive
-                        ? "bg-[#167a55] text-white shadow-sm font-semibold"
-                        : "text-slate-300 hover:bg-[#16382b]/60 hover:text-white"
-                    } ${collapsed ? "justify-center px-0" : ""}`}
-                  >
+            {group.items.map((item) => {
+              const isActive = activeScreen === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onNavigate(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-[#eaf6ef] text-[#167a55] font-semibold"
+                      : "text-[#71817a] hover:text-[#172b25] hover:bg-[#f5f8f6]"
+                  } ${collapsed ? "justify-center" : "justify-between"}`}
+                  title={item.label}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`shrink-0 transition-colors ${
-                        isActive ? "text-white" : "text-emerald-300/80 group-hover:text-white"
+                      className={`shrink-0 ${
+                        isActive ? "text-[#167a55]" : "text-[#71817a]"
                       }`}
                     >
                       {item.icon}
                     </span>
-                    {!collapsed && (
-                      <>
-                        <span className="truncate flex-1 text-left">{item.label}</span>
-                        {item.badge && (
-                          <span
-                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              isActive
-                                ? "bg-white/20 text-white"
-                                : "bg-[#16382b] text-emerald-300 border border-[#235843]"
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </div>
+
+                  {!collapsed && item.badge && (
+                    <Badge
+                      variant={item.badge === "Fast" ? "emerald" : "neutral"}
+                      size="sm"
+                    >
+                      {item.badge}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
           </div>
         ))}
       </div>
 
-      {/* Footer / Toggle */}
-      <div className="p-3 border-t border-[#16382b] bg-[#0c1c16] flex items-center justify-between text-xs text-slate-400">
-        {!collapsed && (
-          <div className="truncate text-[11px]">
-            <span className="text-emerald-400 font-medium">v1.2.4</span> • PostgreSQL 16
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          className="p-1.5 rounded-lg bg-[#16382b] hover:bg-[#1d4737] text-emerald-300 hover:text-white transition-colors"
-        >
-          <ChevronRight
-            className={`w-4 h-4 transition-transform duration-200 ${
-              collapsed ? "" : "rotate-180"
-            }`}
-          />
-        </button>
-      </div>
+      {/* Bottom Toggle when collapsed */}
+      {collapsed && (
+        <div className="p-2 border-t border-[#e2ebe5]">
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="w-full flex items-center justify-center p-2 rounded-lg text-[#71817a] hover:bg-[#f5f8f6]"
+            title="Expand Sidebar"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </aside>
   );
 };
