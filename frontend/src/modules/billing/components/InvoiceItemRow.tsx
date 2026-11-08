@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Trash2, ChevronUp, MoreHorizontal } from "lucide-react";
 import type { InvoiceItemDraft } from "../types/invoiceItem";
 import type { Product } from "../../../services/api";
+import { calculateItemRowTaxes } from "../utils/taxCalculation";
 import { ItemSearch } from "./ItemSearch";
 import { ItemAdvancedDetails } from "./ItemAdvancedDetails";
 
@@ -31,29 +32,17 @@ export const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Auto-calculated fields
-  const gross = item.quantity * item.unit_price;
-  let discountAmount = 0;
-  if (item.discount_type === "percentage") {
-    discountAmount = (gross * (item.discount_value || 0)) / 100;
-  } else {
-    discountAmount = item.discount_value || 0;
-  }
-  const grossLessDiscount = Math.max(0, gross - discountAmount);
-
-  let taxable = grossLessDiscount;
-  let taxAmount = 0;
-  let rowTotal = 0;
-
-  if (item.tax_inclusive && (item.gst_rate || 0) > 0) {
-    taxable = (grossLessDiscount * 100) / (100 + (item.gst_rate || 0));
-    taxAmount = grossLessDiscount - taxable;
-    rowTotal = grossLessDiscount;
-  } else {
-    taxable = grossLessDiscount;
-    taxAmount = (taxable * (item.gst_rate || 0)) / 100;
-    rowTotal = taxable + taxAmount;
-  }
+  // Auto-calculated fields using shared statutory calculation engine
+  const { taxableValue: taxable, totalTax: taxAmount, rowTotal } = calculateItemRowTaxes({
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    discount_type: item.discount_type,
+    discount_value: item.discount_value,
+    gst_rate: item.gst_rate,
+    tax_inclusive: item.tax_inclusive,
+    cess_rate: item.cess_rate,
+    cess_specific: item.cess_specific,
+  });
 
   return (
     <>

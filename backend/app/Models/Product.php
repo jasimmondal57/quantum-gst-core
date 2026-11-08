@@ -15,9 +15,13 @@ class Product extends Model
 
     protected $appends = ['gst_rate'];
 
-    public function getGstRateAttribute()
+    public function getGstRateAttribute(): ?float
     {
-        return (float) ($this->taxCategory?->igst_rate ?? 18.0);
+        if ($this->relationLoaded('taxCategory') || $this->tax_category_id) {
+            return $this->taxCategory ? (float) $this->taxCategory->igst_rate : null;
+        }
+
+        return null;
     }
 
     public function business()

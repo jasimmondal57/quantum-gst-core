@@ -209,11 +209,11 @@ class InvoiceApiTest extends TestCase
         $custResp->assertStatus(201);
         $this->assertEquals('27AAACT2727Q1ZW', $custResp->json('gstin'));
 
-        // 2. Create Supplier / Vendor
+        // 2. Create Supplier / Vendor (Unregistered without GSTIN)
         $suppPayload = [
             'business_id' => $business->id,
             'customer_type' => 'supplier',
-            'name' => 'Foxconn Components India',
+            'name' => 'Local Artisan Handcrafts (Unregistered)',
             'state_code' => '33',
             'state_name' => 'Tamil Nadu',
             'billing_pincode' => '600001',
@@ -222,5 +222,44 @@ class InvoiceApiTest extends TestCase
         $suppResp = $this->actingAs($user)->postJson('/api/v1/customers', $suppPayload);
         $suppResp->assertStatus(201);
         $this->assertEquals('supplier', $suppResp->json('customer_type'));
+        $this->assertNull($suppResp->json('gstin'));
+
+        // 3. Create Overseas Export Party (Without Indian GSTIN, state 99)
+        $exportPayload = [
+            'business_id' => $business->id,
+            'customer_type' => 'export',
+            'name' => 'Acme International LLC (Dubai UAE)',
+            'state_code' => '99',
+            'state_name' => 'Other Territory / Overseas',
+        ];
+
+        $exportResp = $this->actingAs($user)->postJson('/api/v1/customers', $exportPayload);
+        $exportResp->assertStatus(201);
+        $this->assertEquals('export', $exportResp->json('customer_type'));
+        $this->assertEquals('99', $exportResp->json('state_code'));
+    }
+
+    public function test_product_without_tax_category_does_not_silently_fallback_to_18_percent()
+    {
+        $user = User::factory()->create();
+        $org = Organization::create(['name' => 'Acme Corp', 'slug' => 'acme-corp']);
+        $org->users()->attach($user->id, [
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'role' => 'owner',
+            'status' => 'active',
+        ]);
+        $business = Business::create(['organization_id' => $org->id, 'legal_name' => 'Acme Tech']);
+
+        // Create product without tax category
+        $product = \App\Models\Product::create([
+            'business_id' => $business->id,
+            'type' => 'goods',
+            'name' => 'Uncategorized Raw Mineral',
+            'hsn_sac' => '2501',
+            'sale_price' => 500,
+        ]);
+
+        // Accessor must return null, NOT 18.0!
+        $this->assertNull($product->gst_rate);
     }
 }

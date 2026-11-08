@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Barcode, PackagePlus, Layers, ListPlus, Search, CheckSquare, Square } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Plus, Barcode, PackagePlus, Layers, ListPlus, Search, CheckSquare, Square, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import { Badge } from "../../../components/ui/Badge";
@@ -29,6 +29,64 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
   const [showBulkPicker, setShowBulkPicker] = useState(false);
   const [bulkSearch, setBulkSearch] = useState("");
   const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({});
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [scannedCode, setScannedCode] = useState("");
+  const [scannerFeedback, setScannerFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showBarcodeScanner && barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+  }, [showBarcodeScanner]);
+
+  const handleBarcodeSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const code = scannedCode.trim();
+    if (!code) return;
+
+    const match = products.find(
+      (p) =>
+        (p.sku && p.sku.toLowerCase() === code.toLowerCase()) ||
+        (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) ||
+        p.id === code
+    );
+
+    if (match) {
+      const rate = typeof match.selling_price === "string"
+        ? parseFloat(match.selling_price)
+        : (match.selling_price ?? (typeof match.sale_price === "string" ? parseFloat(match.sale_price) : 0));
+      const gst = typeof match.gst_rate === "number"
+        ? match.gst_rate
+        : (typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18));
+
+      onAddItem({
+        product_id: match.id,
+        item_name: match.name,
+        sku: match.sku || "",
+        hsn_sac: match.hsn_code || match.hsn_sac || "9983",
+        unit: match.unit || "NOS",
+        unit_price: rate,
+        gst_rate: gst,
+        tax_inclusive: !!match.tax_inclusive,
+      });
+
+      setScannerFeedback({
+        type: "success",
+        message: `✓ Added "${match.name}" (Rate: ₹${rate.toFixed(2)})`,
+      });
+      setScannedCode("");
+    } else {
+      setScannerFeedback({
+        type: "error",
+        message: `✕ No catalog item matches barcode / SKU "${code}"`,
+      });
+    }
+
+    if (barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+  };
 
   const toggleSelectProduct = (productId: string) => {
     setSelectedQuantities((prev) => {
@@ -119,33 +177,15 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
 
           <Button
             type="button"
-            variant="outline"
+            variant={showBarcodeScanner ? "primary" : "outline"}
             size="sm"
             onClick={() => {
-              const barcode = prompt("Scan or enter product barcode:");
-              if (barcode) {
-                const match = products.find((p) => p.sku === barcode || p.barcode === barcode);
-                if (match) {
-                  const rate = typeof match.selling_price === "string" ? parseFloat(match.selling_price) : (match.selling_price || 0);
-                  const gst = typeof match.gst_rate === "string" ? parseFloat(match.gst_rate) : (match.gst_rate ?? 18);
-                  onAddItem({
-                    product_id: match.id,
-                    item_name: match.name,
-                    sku: match.sku || "",
-                    hsn_sac: match.hsn_code || match.hsn_sac || "9983",
-                    unit: match.unit || "NOS",
-                    unit_price: rate,
-                    gst_rate: gst,
-                    tax_inclusive: !!match.tax_inclusive,
-                  });
-                } else {
-                  alert(`No product found with barcode: ${barcode}`);
-                }
-              }
+              setShowBarcodeScanner(!showBarcodeScanner);
+              setScannerFeedback(null);
             }}
             icon={<Barcode className="w-3.5 h-3.5" />}
           >
-            Scan Barcode
+            {showBarcodeScanner ? "Close Scanner" : "Scan Barcode"}
           </Button>
 
           <Button
@@ -159,6 +199,53 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* USB / Laser Barcode Scanner Interface */}
+      {showBarcodeScanner && (
+        <div className="p-3 bg-emerald-50/80 border-b border-emerald-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 animate-in slide-in-from-top-2 duration-150">
+          <form onSubmit={handleBarcodeSubmit} className="flex-1 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Barcode className="w-4 h-4 absolute left-3 top-2.5 text-emerald-700" />
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                placeholder="Scan barcode with USB reader or type SKU & press Enter..."
+                value={scannedCode}
+                onChange={(e) => setScannedCode(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-emerald-300 bg-white font-mono text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <Button type="submit" variant="primary" size="sm">
+              Add
+            </Button>
+          </form>
+
+          {scannerFeedback && (
+            <div
+              className={`text-xs font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 ${
+                scannerFeedback.type === "success"
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                  : "bg-red-100 text-red-800 border border-red-300"
+              }`}
+            >
+              {scannerFeedback.type === "success" ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              )}
+              <span>{scannerFeedback.message}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowBarcodeScanner(false)}
+            className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">

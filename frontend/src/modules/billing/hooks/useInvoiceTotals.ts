@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { InvoiceItemDraft } from "../types/invoiceItem";
 import type { AdditionalCharge, SupplyType } from "../types/invoice";
+import { calculateItemRowTaxes } from "../utils/taxCalculation";
 
 export const UT_STATE_CODES = ["04", "26", "31", "35", "38", "97"]; // Chandigarh, DNH&DD, Lakshadweep, A&N, Ladakh, Other
 
@@ -77,24 +78,18 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
     let totalCess = 0;
 
     const calculatedItems = items.map((item) => {
-      const gross = round2(item.quantity * item.unit_price);
-      let itemDiscount = 0;
-      if (item.discount_type === "percentage") {
-        itemDiscount = round2((gross * (item.discount_value || 0)) / 100);
-      } else {
-        itemDiscount = round2(item.discount_value || 0);
-      }
-      if (itemDiscount > gross) itemDiscount = gross;
+      const rowCalc = calculateItemRowTaxes({
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_type: item.discount_type,
+        discount_value: item.discount_value,
+        gst_rate: isZeroRated ? 0 : item.gst_rate,
+        tax_inclusive: item.tax_inclusive,
+        cess_rate: isZeroRated ? 0 : item.cess_rate,
+        cess_specific: isZeroRated ? 0 : item.cess_specific,
+      });
 
-      const grossLessDiscount = round2(gross - itemDiscount);
-      let taxableValue = grossLessDiscount;
-
-      // Extract taxable base if rate is tax-inclusive as per GST statutory reverse calculation
-      if (item.tax_inclusive && !isZeroRated && item.gst_rate > 0) {
-        const totalTaxPercent = item.gst_rate + (item.cess_rate || 0);
-        taxableValue = round2((grossLessDiscount * 100) / (100 + totalTaxPercent));
-      }
-
+      const { gross, itemDiscount, taxableValue, cessAmount, gstAmount } = rowCalc;
       subtotal += item.tax_inclusive ? taxableValue : gross;
       totalItemDiscount += itemDiscount;
 
@@ -106,41 +101,33 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
       let utgstAmt = 0;
       let igstRate = 0;
       let igstAmt = 0;
-      let cessAmt = 0;
 
       if (!isZeroRated && taxableValue > 0) {
         if (isInterstate) {
           igstRate = item.gst_rate;
-          igstAmt = round2((taxableValue * igstRate) / 100);
+          igstAmt = gstAmount;
           totalIgst += igstAmt;
         } else if (isUtgst) {
           cgstRate = round2(item.gst_rate / 2);
           utgstRate = round2(item.gst_rate / 2);
-          cgstAmt = round2((taxableValue * cgstRate) / 100);
-          utgstAmt = round2((taxableValue * utgstRate) / 100);
+          cgstAmt = round2(gstAmount / 2);
+          utgstAmt = round2(gstAmount - cgstAmt);
           totalCgst += cgstAmt;
           totalUtgst += utgstAmt;
         } else {
           cgstRate = round2(item.gst_rate / 2);
           sgstRate = round2(item.gst_rate / 2);
-          cgstAmt = round2((taxableValue * cgstRate) / 100);
-          sgstAmt = round2((taxableValue * sgstRate) / 100);
+          cgstAmt = round2(gstAmount / 2);
+          sgstAmt = round2(gstAmount - cgstAmt);
           totalCgst += cgstAmt;
           totalSgst += sgstAmt;
         }
 
-        // Cess calculation
-        if (item.cess_rate && item.cess_rate > 0) {
-          cessAmt += round2((taxableValue * item.cess_rate) / 100);
-        }
-        if (item.cess_specific && item.cess_specific > 0) {
-          cessAmt += round2(item.quantity * item.cess_specific);
-        }
-        totalCess += cessAmt;
+        totalCess += cessAmount;
       }
 
-      const totalTax = round2(cgstAmt + sgstAmt + utgstAmt + igstAmt + cessAmt);
-      const totalAmount = round2(taxableValue + totalTax);
+      const totalTax = round2(cgstAmt + sgstAmt + utgstAmt + igstAmt + cessAmount);
+      const totalAmount = item.tax_inclusive ? rowCalc.grossLessDiscount : round2(taxableValue + totalTax);
 
       return {
         ...item,
@@ -151,7 +138,7 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
         sgst_amount: isUtgst ? utgstAmt : sgstAmt,
         igst_rate: igstRate,
         igst_amount: igstAmt,
-        cess_amount: cessAmt,
+        cess_amount: cessAmount,
         total_tax: totalTax,
         total_amount: totalAmount,
       };

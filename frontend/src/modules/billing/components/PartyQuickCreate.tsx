@@ -30,9 +30,32 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
   const [stateCode, setStateCode] = useState("27");
   const [stateName, setStateName] = useState("Maharashtra");
   const [pincode, setPincode] = useState("");
-  const [registrationType, setRegistrationType] = useState<Party["registration_type"]>("regular");
+  const [registrationType, setRegistrationType] = useState<Party["registration_type"]>(
+    partyType === "supplier" ? "unregistered" : "regular"
+  );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Sync initial state and defaults when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setErrorMsg("");
+      if (!gstin) {
+        setRegistrationType(partyType === "supplier" ? "unregistered" : "regular");
+      }
+    }
+  }, [isOpen, partyType]);
+
+  const handleRegistrationTypeChange = (newType: Party["registration_type"]) => {
+    setRegistrationType(newType);
+    if (newType === "overseas") {
+      setStateCode("99");
+      setStateName("Other Territory / Overseas");
+    } else if (stateCode === "99") {
+      setStateCode("27");
+      setStateName("Maharashtra");
+    }
+  };
 
   const handleStateChange = (code: string) => {
     setStateCode(code);
@@ -78,24 +101,25 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
       }
 
       const gstinState = cleanGstin.substring(0, 2);
-      if (gstinState !== stateCode) {
+      if (gstinState !== stateCode && registrationType !== "overseas") {
         setErrorMsg(`GSTIN state prefix (${gstinState}) does not match the selected State (${stateCode} - ${stateName}). Please select matching state.`);
         return;
       }
 
-      if (registrationType === "unregistered") {
-        setErrorMsg("Unregistered party cannot hold a GSTIN. Please change Registration Category to 'Regular' or clear the GSTIN.");
+      if (registrationType === "unregistered" || registrationType === "consumer") {
+        setErrorMsg("Unregistered parties/consumers cannot hold a GSTIN. Please change Registration Category to 'Regular' or clear the GSTIN.");
         return;
       }
     } else {
+      // No GSTIN provided
       if (registrationType === "regular" || registrationType === "composition" || registrationType === "sez") {
-        setErrorMsg(`GSTIN is statutory mandatory for ${registrationType.toUpperCase()} registered business entities.`);
+        setErrorMsg(`GSTIN is mandatory for ${registrationType.toUpperCase()} registered entities. For unregistered suppliers/buyers, select 'Unregistered Business' or 'Overseas Export'.`);
         return;
       }
     }
 
-    if (pincode.trim() && pincode.trim().length !== 6) {
-      setErrorMsg("PIN code must be exactly 6 digits");
+    if (pincode.trim() && pincode.trim().length !== 6 && registrationType !== "overseas") {
+      setErrorMsg("PIN code must be exactly 6 digits (or leave blank for overseas parties)");
       return;
     }
 
@@ -106,14 +130,18 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
 
     setLoading(true);
     try {
-      // Determine statutory customer_type for backend validation
+      // Statutory party classification mapping
       let custType = "b2c";
       if (partyType === "supplier") {
         custType = "supplier";
-      } else if (gstin.trim()) {
-        if (registrationType === "sez") custType = "sez";
-        else if (registrationType === "overseas") custType = "export";
-        else custType = "b2b";
+      } else if (registrationType === "overseas") {
+        custType = "export";
+      } else if (registrationType === "sez") {
+        custType = "sez";
+      } else if (cleanGstin) {
+        custType = "b2b";
+      } else {
+        custType = "b2c";
       }
 
       const payload = {
@@ -228,7 +256,7 @@ export const PartyQuickCreate: React.FC<PartyQuickCreateProps> = ({
             </label>
             <select
               value={registrationType}
-              onChange={(e) => setRegistrationType(e.target.value as Party["registration_type"])}
+              onChange={(e) => handleRegistrationTypeChange(e.target.value as Party["registration_type"])}
               className="w-full text-xs rounded-lg border border-[#e2ebe5] px-3 py-2 bg-white text-[#172b25] focus:outline-none focus:border-[#167a55]"
             >
               <option value="regular">Regular GST Registered (B2B)</option>
