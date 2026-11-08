@@ -98,6 +98,7 @@ export const DebitNoteCreate: React.FC<DebitNoteCreateProps> = ({
         <div className="lg:col-span-8 space-y-4">
           <PartySelector
             partyType="supplier"
+            businessId={bizId}
             selectedParty={selectedParty}
             parties={suppliers.map((s) => ({
               id: s.id,
@@ -142,6 +143,7 @@ export const DebitNoteCreate: React.FC<DebitNoteCreateProps> = ({
           </div>
 
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
             products={products}
             onAddItem={addItem}
@@ -174,3 +176,4 @@ export const DebitNoteCreate: React.FC<DebitNoteCreateProps> = ({
     </div>
   );
 };
+

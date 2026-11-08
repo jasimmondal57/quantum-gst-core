@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { BusinessProfile, Customer, Product } from "../../../services/api";
 import { api } from "../../../services/api";
 import type { DocumentType } from "../types/invoice";
+import type { Party } from "../types/party";
 import { useInvoiceForm } from "../hooks/useInvoiceForm";
 import { useInvoiceTotals } from "../hooks/useInvoiceTotals";
 import { DocumentHeader } from "../components/DocumentHeader";
@@ -26,6 +27,8 @@ export interface SalesInvoiceCreateProps {
   products: Product[];
   onInvoiceCreated: () => void;
   onNavigate: (route: string) => void;
+  onCustomerCreated?: (customer: Customer) => void;
+  onProductCreated?: (product: Product) => void;
 }
 
 export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
@@ -34,15 +37,48 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
   products,
   onInvoiceCreated,
   onNavigate,
+  onCustomerCreated,
+  onProductCreated,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
+  useEffect(() => {
+    setLocalCustomers(customers);
+  }, [customers]);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
 
   // Derive business organization and GSTIN
   const orgId = business?.organization_id || "00000000-0000-0000-0000-000000000000";
   const bizId = business?.id || "";
   const primaryGstin = business?.gstins?.[0];
   const bizStateCode = primaryGstin?.state_code || "27";
+
+  const handlePartyCreated = (newParty: Party) => {
+    const newCust: Customer = {
+      id: newParty.id || "",
+      business_id: bizId,
+      name: newParty.name,
+      gstin: newParty.gstin,
+      phone: newParty.phone,
+      email: newParty.email,
+      address: newParty.billing_address,
+      state: newParty.billing_state,
+      state_code: newParty.billing_state_code || "27",
+    };
+    setLocalCustomers((prev) => [newCust, ...prev]);
+    onCustomerCreated?.(newCust);
+  };
+
+  const handleProductCreated = (newProd: Product) => {
+    setLocalProducts((prev) => [newProd, ...prev]);
+    onProductCreated?.(newProd);
+  };
 
   const {
     documentType,
@@ -192,8 +228,9 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
           {/* Party Selection & Address */}
           <PartySelector
             partyType="customer"
+            businessId={bizId}
             selectedParty={selectedParty}
-            parties={customers.map((c) => ({
+            parties={localCustomers.map((c) => ({
               id: c.id,
               name: c.name,
               party_type: "customer",
@@ -206,6 +243,7 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
               billing_state_code: c.state_code || (c.gstin ? c.gstin.substring(0, 2) : "27"),
             }))}
             onSelectParty={handleSelectParty}
+            onPartyCreated={handlePartyCreated}
           />
 
           <AddressEditor
@@ -237,11 +275,13 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
 
           {/* Line Items Table */}
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
-            products={products}
+            products={localProducts}
             onAddItem={addItem}
             onUpdateItem={updateItem}
             onRemoveItem={removeItem}
+            onProductCreated={handleProductCreated}
           />
 
           {/* Collapsible Adjustments: Discounts, Additional Charges, Tax Summary */}
@@ -328,3 +368,4 @@ export const SalesInvoiceCreate: React.FC<SalesInvoiceCreateProps> = ({
     </div>
   );
 };
+

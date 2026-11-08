@@ -81,6 +81,7 @@ export const DeliveryChallanCreate: React.FC<DeliveryChallanCreateProps> = ({
       <div className="space-y-4 max-w-5xl">
         <PartySelector
           partyType="customer"
+          businessId={bizId}
           selectedParty={selectedParty}
           parties={customers.map((c) => ({
             id: c.id,
@@ -156,6 +157,7 @@ export const DeliveryChallanCreate: React.FC<DeliveryChallanCreateProps> = ({
         </div>
 
         <InvoiceItemsTable
+          businessId={bizId}
           items={items}
           products={products}
           onAddItem={addItem}
@@ -190,3 +192,4 @@ export const DeliveryChallanCreate: React.FC<DeliveryChallanCreateProps> = ({
     </div>
   );
 };
+

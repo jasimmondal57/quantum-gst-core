@@ -299,6 +299,8 @@ export function App() {
             refreshCloudData();
             navigateTo("sales");
           }}
+          onCustomerCreated={(c) => setCustomers((prev) => [c, ...prev])}
+          onProductCreated={(p) => setProducts((prev) => [p, ...prev])}
           onNavigate={(route) => {
             const screen = getScreenFromPathname(route);
             navigateTo(screen);

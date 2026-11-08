@@ -146,3 +146,4 @@ export const GSTSummary: React.FC<GSTSummaryProps> = ({ totals }) => {
     </div>
   );
 };
+

@@ -9,14 +9,18 @@ export interface PartySelectorProps {
   partyType?: "customer" | "supplier" | "both";
   selectedParty: Party | null;
   parties: Party[];
+  businessId?: string;
   onSelectParty: (party: Party | null) => void;
+  onPartyCreated?: (party: Party) => void;
 }
 
 export const PartySelector: React.FC<PartySelectorProps> = ({
   partyType = "customer",
   selectedParty,
   parties,
+  businessId = "",
   onSelectParty,
+  onPartyCreated,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,6 +44,7 @@ export const PartySelector: React.FC<PartySelectorProps> = ({
 
   const handleQuickCreated = (p: Party) => {
     onSelectParty(p);
+    onPartyCreated?.(p);
     setShowQuickCreate(false);
   };
 
@@ -174,10 +179,12 @@ export const PartySelector: React.FC<PartySelectorProps> = ({
 
       <PartyQuickCreate
         isOpen={showQuickCreate}
+        businessId={businessId}
         partyType={partyType}
         onClose={() => setShowQuickCreate(false)}
-        onSave={handleQuickCreated}
+        onSaved={handleQuickCreated}
       />
     </div>
   );
 };
+

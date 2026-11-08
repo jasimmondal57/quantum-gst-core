@@ -44,19 +44,19 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Dialog container */}
-      <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
+      <div className="flex min-h-full items-center justify-center p-2 sm:p-4 text-center">
         <div
-          className={`w-full ${maxWidthStyles} transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-200/80 my-8`}
+          className={`w-full ${maxWidthStyles} flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] transform rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-200/80 my-auto overflow-hidden`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           {(title || subtitle) && (
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-white">
               <div>
                 {title && (
                   <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
@@ -78,13 +78,13 @@ export const Modal: React.FC<ModalProps> = ({
           )}
 
           {/* Body */}
-          <div className="px-5 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-5 py-4 overscroll-contain">
             {children}
           </div>
 
           {/* Footer */}
           {footer && (
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <div className="shrink-0 px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
               {footer}
             </div>
           )}

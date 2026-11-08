@@ -110,6 +110,7 @@ export const CreditNoteCreate: React.FC<CreditNoteCreateProps> = ({
         <div className="lg:col-span-8 space-y-4">
           <PartySelector
             partyType="customer"
+            businessId={bizId}
             selectedParty={selectedParty}
             parties={customers.map((c) => ({
               id: c.id,
@@ -177,6 +178,7 @@ export const CreditNoteCreate: React.FC<CreditNoteCreateProps> = ({
           </div>
 
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
             products={products}
             onAddItem={addItem}

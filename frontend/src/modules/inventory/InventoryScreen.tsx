@@ -63,8 +63,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
       setSalePrice("");
       setPurchasePrice("");
       onRefresh();
-    } catch (err: any) {
-      alert("Error adding product: " + (err.message || "Failed"));
+    } catch (err: unknown) {
+      alert("Error adding product: " + ((err as Error).message || "Failed"));
     } finally {
       setLoading(false);
     }
@@ -245,9 +245,32 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         onClose={() => setShowAddProductModal(false)}
         title="Add Product / Service Master"
         subtitle="Saved items will auto-populate taxes in invoices & POS"
-        size="md"
+        size="lg"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddProductModal(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="add-inventory-product-form"
+              variant="primary"
+              size="sm"
+              loading={loading}
+              icon={<CheckCircle2 className="w-4 h-4" />}
+            >
+              Save Item
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateProduct} className="space-y-4">
+        <form id="add-inventory-product-form" onSubmit={handleCreateProduct} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Item / Service Name"
@@ -319,26 +342,6 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               onChange={(e) => setPurchasePrice(e.target.value)}
               placeholder="0.00"
             />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddProductModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              loading={loading}
-              icon={<CheckCircle2 className="w-4 h-4" />}
-            >
-              Save Item
-            </Button>
           </div>
         </form>
       </Modal>

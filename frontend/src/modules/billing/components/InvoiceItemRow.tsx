@@ -9,9 +9,11 @@ export interface InvoiceItemRowProps {
   index: number;
   item: InvoiceItemDraft;
   products: Product[];
+  businessId?: string;
   onUpdate: (updates: Partial<InvoiceItemDraft>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  onProductCreated?: (product: Product) => void;
 }
 
 const COMMON_UNITS = ["NOS", "PCS", "KG", "MTR", "BOX", "SET", "LTR", "BAG", "ROLL", "SQM", "HRS"];
@@ -21,9 +23,11 @@ export const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
   index,
   item,
   products,
+  businessId,
   onUpdate,
   onRemove,
   canRemove,
+  onProductCreated,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -50,9 +54,11 @@ export const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
         <td className="p-2 min-w-[200px]">
           <ItemSearch
             products={products}
+            businessId={businessId}
             currentName={item.item_name}
             onNameChange={(name) => onUpdate({ item_name: name })}
             onSelectProduct={(updates) => onUpdate(updates)}
+            onProductCreated={onProductCreated}
           />
         </td>
 

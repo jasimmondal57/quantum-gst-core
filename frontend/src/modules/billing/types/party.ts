@@ -24,3 +24,4 @@ export interface Party {
   opening_balance?: number;
   current_balance?: number;
 }
+

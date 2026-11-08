@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { BusinessProfile, Customer, Product } from "../../../services/api";
+import type { Party } from "../types/party";
 import { useInvoiceForm } from "../hooks/useInvoiceForm";
 import { useInvoiceTotals } from "../hooks/useInvoiceTotals";
 import { DocumentHeader } from "../components/DocumentHeader";
@@ -26,6 +27,17 @@ export const QuotationCreate: React.FC<QuotationCreateProps> = ({
 }) => {
   const isSaving = false;
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
+  useEffect(() => {
+    setLocalCustomers(customers);
+  }, [customers]);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
   const [validUntil, setValidUntil] = useState<string>(
     new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0]
   );
@@ -34,6 +46,25 @@ export const QuotationCreate: React.FC<QuotationCreateProps> = ({
   const bizId = business?.id || "";
   const primaryGstin = business?.gstins?.[0];
   const bizStateCode = primaryGstin?.state_code || "27";
+
+  const handleCustomerCreated = (newParty: Party) => {
+    const newCust: Customer = {
+      id: newParty.id || "",
+      business_id: bizId,
+      name: newParty.name,
+      gstin: newParty.gstin,
+      phone: newParty.phone,
+      email: newParty.email,
+      address: newParty.billing_address,
+      state: newParty.billing_state,
+      state_code: newParty.billing_state_code || "27",
+    };
+    setLocalCustomers((prev) => [newCust, ...prev]);
+  };
+
+  const handleProductCreated = (newProd: Product) => {
+    setLocalProducts((prev) => [newProd, ...prev]);
+  };
 
   const {
     documentType,
@@ -105,8 +136,9 @@ export const QuotationCreate: React.FC<QuotationCreateProps> = ({
         <div className="lg:col-span-8 space-y-4">
           <PartySelector
             partyType="customer"
+            businessId={bizId}
             selectedParty={selectedParty}
-            parties={customers.map((c) => ({
+            parties={localCustomers.map((c) => ({
               id: c.id,
               name: c.name,
               party_type: "customer",
@@ -119,6 +151,7 @@ export const QuotationCreate: React.FC<QuotationCreateProps> = ({
               billing_state_code: c.state_code || (c.gstin ? c.gstin.substring(0, 2) : "27"),
             }))}
             onSelectParty={handleSelectParty}
+            onPartyCreated={handleCustomerCreated}
           />
 
           <div className="bg-white border border-[#e2ebe5] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -147,11 +180,13 @@ export const QuotationCreate: React.FC<QuotationCreateProps> = ({
           </div>
 
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
-            products={products}
+            products={localProducts}
             onAddItem={addItem}
             onUpdateItem={updateItem}
             onRemoveItem={removeItem}
+            onProductCreated={handleProductCreated}
           />
 
           <GSTSummary totals={totals} />

@@ -46,3 +46,4 @@ export function usePartySearch(customers: Customer[], initialPartyType: "custome
     allParties: parties,
   };
 }
+

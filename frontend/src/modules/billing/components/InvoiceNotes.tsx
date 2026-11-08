@@ -82,3 +82,4 @@ export const InvoiceNotes: React.FC<InvoiceNotesProps> = ({
     </div>
   );
 };
+

@@ -96,6 +96,7 @@ export const ProformaCreate: React.FC<ProformaCreateProps> = ({
         <div className="lg:col-span-8 space-y-4">
           <PartySelector
             partyType="customer"
+            businessId={bizId}
             selectedParty={selectedParty}
             parties={customers.map((c) => ({
               id: c.id,
@@ -127,6 +128,7 @@ export const ProformaCreate: React.FC<ProformaCreateProps> = ({
           </div>
 
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
             products={products}
             onAddItem={addItem}

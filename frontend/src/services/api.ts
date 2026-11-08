@@ -374,7 +374,11 @@ class QuantumApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to create customer");
+    }
+    return json;
   }
 
   async fetchGstr1Summary(businessId?: string) {

@@ -6,19 +6,23 @@ import type { Product } from "../../../services/api";
 import { InvoiceItemRow } from "./InvoiceItemRow";
 
 export interface InvoiceItemsTableProps {
+  businessId?: string;
   items: InvoiceItemDraft[];
   products: Product[];
   onAddItem: (item?: Partial<InvoiceItemDraft>) => void;
   onUpdateItem: (index: number, updates: Partial<InvoiceItemDraft>) => void;
   onRemoveItem: (index: number) => void;
+  onProductCreated?: (product: Product) => void;
 }
 
 export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
+  businessId,
   items,
   products,
   onAddItem,
   onUpdateItem,
   onRemoveItem,
+  onProductCreated,
 }) => {
   return (
     <div className="bg-white border border-[#e2ebe5] rounded-xl overflow-hidden shadow-sm space-y-0">
@@ -98,9 +102,11 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
                 index={idx}
                 item={item}
                 products={products}
+                businessId={businessId}
                 onUpdate={(updates) => onUpdateItem(idx, updates)}
                 onRemove={() => onRemoveItem(idx)}
                 canRemove={items.length > 1}
+                onProductCreated={onProductCreated}
               />
             ))}
           </tbody>
@@ -125,3 +131,4 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
     </div>
   );
 };
+

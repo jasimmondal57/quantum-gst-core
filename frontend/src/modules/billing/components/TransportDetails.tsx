@@ -145,3 +145,4 @@ export const TransportDetails: React.FC<TransportDetailsProps> = ({
     </div>
   );
 };
+

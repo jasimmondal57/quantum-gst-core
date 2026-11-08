@@ -21,3 +21,4 @@ export function useProductSearch(products: Product[]) {
     filteredProducts,
   };
 }
+

@@ -80,3 +80,4 @@ export const ItemAdvancedDetails: React.FC<ItemAdvancedDetailsProps> = ({ item, 
     </div>
   );
 };
+

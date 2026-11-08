@@ -136,3 +136,4 @@ export interface InvoiceDraft {
   internal_notes?: string;
   bank_details_id?: string;
 }
+

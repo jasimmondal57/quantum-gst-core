@@ -222,3 +222,4 @@ export function useInvoiceTotals(params: CalculateTotalsParams): CalculatedTotal
     params.additionalCharges,
   ]);
 }
+

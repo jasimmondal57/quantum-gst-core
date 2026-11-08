@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { BusinessProfile, Customer, Product } from "../../../services/api";
 import { api } from "../../../services/api";
 import type { DocumentType } from "../types/invoice";
+import type { Party } from "../types/party";
 import { useInvoiceForm } from "../hooks/useInvoiceForm";
 import { useInvoiceTotals } from "../hooks/useInvoiceTotals";
 import { DocumentHeader } from "../components/DocumentHeader";
@@ -33,11 +34,40 @@ export const PurchaseBillCreate: React.FC<PurchaseBillCreateProps> = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [localSuppliers, setLocalSuppliers] = useState<Customer[]>(suppliers);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
+  useEffect(() => {
+    setLocalSuppliers(suppliers);
+  }, [suppliers]);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
 
   const orgId = business?.organization_id || "00000000-0000-0000-0000-000000000000";
   const bizId = business?.id || "";
   const primaryGstin = business?.gstins?.[0];
   const bizStateCode = primaryGstin?.state_code || "27";
+
+  const handleSupplierCreated = (newParty: Party) => {
+    const newSupp: Customer = {
+      id: newParty.id || "",
+      business_id: bizId,
+      name: newParty.name,
+      gstin: newParty.gstin,
+      phone: newParty.phone,
+      email: newParty.email,
+      address: newParty.billing_address,
+      state: newParty.billing_state,
+      state_code: newParty.billing_state_code || "27",
+    };
+    setLocalSuppliers((prev) => [newSupp, ...prev]);
+  };
+
+  const handleProductCreated = (newProd: Product) => {
+    setLocalProducts((prev) => [newProd, ...prev]);
+  };
 
   const {
     documentType,
@@ -181,8 +211,9 @@ export const PurchaseBillCreate: React.FC<PurchaseBillCreateProps> = ({
           {/* Supplier Selector */}
           <PartySelector
             partyType="supplier"
+            businessId={bizId}
             selectedParty={selectedParty}
-            parties={suppliers.map((s) => ({
+            parties={localSuppliers.map((s) => ({
               id: s.id,
               name: s.name,
               party_type: "supplier",
@@ -195,6 +226,7 @@ export const PurchaseBillCreate: React.FC<PurchaseBillCreateProps> = ({
               billing_state_code: s.state_code || (s.gstin ? s.gstin.substring(0, 2) : "27"),
             }))}
             onSelectParty={handleSelectParty}
+            onPartyCreated={handleSupplierCreated}
           />
 
           <AddressEditor
@@ -294,11 +326,13 @@ export const PurchaseBillCreate: React.FC<PurchaseBillCreateProps> = ({
 
           {/* Items Table */}
           <InvoiceItemsTable
+            businessId={bizId}
             items={items}
-            products={products}
+            products={localProducts}
             onAddItem={addItem}
             onUpdateItem={updateItem}
             onRemoveItem={removeItem}
+            onProductCreated={handleProductCreated}
           />
 
           <GSTSummary totals={totals} />

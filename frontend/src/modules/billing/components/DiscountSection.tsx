@@ -93,3 +93,4 @@ export const DiscountSection: React.FC<DiscountSectionProps> = ({
     </div>
   );
 };
+
