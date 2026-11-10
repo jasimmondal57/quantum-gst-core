@@ -17,7 +17,7 @@ jobs:
         env:
           POSTGRES_DB: quantum_gst_test
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: secret_db_password
+          POSTGRES_PASSWORD: postgres_ci_password
         ports:
           - 5432:5432
         options: >-
@@ -66,16 +66,16 @@ jobs:
       - name: Run Migrations and Execute Test Suite
         env:
           APP_ENV: testing
-          APP_KEY: base64:a0B1c2D3e4F5g6H7i8J9k0L1m2N3o4P5q6R7s8T9u0V=
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: quantum_gst_test
           DB_USERNAME: postgres
-          DB_PASSWORD: secret_db_password
+          DB_PASSWORD: postgres_ci_password
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
         run: |
+          export APP_KEY=$(php artisan key:generate --show)
           php artisan test --stop-on-failure
         working-directory: backend
 
